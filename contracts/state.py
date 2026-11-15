@@ -1,7 +1,7 @@
 """
 Shared LangGraph state. Every node reads from and writes to this one object.
 
-Owner: Person 3 (LangGraph lead). Change only after telling the team.
+Owner: Devanshu (LangGraph lead). Change only after telling the team.
 
 Rules:
   * Store plain dicts (e.g. RagProduct(...).model_dump()), not Pydantic objects,
@@ -124,27 +124,27 @@ class StepLogEntry(TypedDict):
 # ---------------- The state ----------------
 
 class AgentState(TypedDict, total=False):
-    # Input (Person 4: ASR)
+    # Input (Alekhya: ASR)
     session_id: str
     audio_path: Optional[str]
     transcript: str
     asr_segments: list[dict]                 # [{"start": 0.0, "end": 1.2, "text": "..."}]
 
-    # Router (Person 3)
+    # Router (Devanshu)
     intent: Intent
     constraints: Constraints
     safety: SafetyCheck
     clarification_question: Optional[str]
 
-    # Planner (Person 3)
+    # Planner (Devanshu)
     plan: Plan
 
-    # Retriever (Person 3, using Person 1 and 2's tools)
+    # Retriever (Devanshu, using Akshaj's and Juan's tools)
     rag_results: list[dict]                  # RagProduct.model_dump()
     web_results: list[dict]                  # WebResult.model_dump()
     reconciled: list[ReconciledProduct]
 
-    # Answerer / Critic (Person 5)
+    # Answerer / Critic (Beste)
     draft_answer: str
     critic: CriticVerdict
     revision_count: int
@@ -153,7 +153,7 @@ class AgentState(TypedDict, total=False):
     citations: list[Citation]
     spoken_summary: str                      # <= ~40 words, no markers, for TTS
 
-    # Output (Person 4: TTS)
+    # Output (Alekhya: TTS)
     tts_audio_path: Optional[str]
 
     # Logging: these lists APPEND across nodes instead of overwriting

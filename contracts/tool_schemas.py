@@ -1,8 +1,8 @@
 """
 Tool contracts for the MCP server.
 
-Owner: Person 2 (MCP server). Person 1 implements the search behind rag.search.
-Person 3's Retriever node calls these tools. Change only after telling the team.
+Owner: Juan (MCP server). Akshaj implements the search behind rag.search.
+Devanshu's Retriever node calls these tools. Change only after telling the team.
 
 Pydantic models give you JSON schemas for free, which you need for MCP tool
 discovery. Run `python -m contracts.tool_schemas` to export tool_schemas.json.
