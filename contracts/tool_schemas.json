@@ -1,0 +1,423 @@
+{
+  "rag.search": {
+    "description": "Search the private Amazon product catalog with semantic search plus metadata filters. Use for product facts. Returns doc_id for citations.",
+    "inputSchema": {
+      "properties": {
+        "query": {
+          "description": "Natural-language search text, e.g. 'eco-friendly stainless steel cleaner'.",
+          "minLength": 1,
+          "title": "Query",
+          "type": "string"
+        },
+        "top_k": {
+          "default": 5,
+          "description": "Number of products to return.",
+          "maximum": 20,
+          "minimum": 1,
+          "title": "Top K",
+          "type": "integer"
+        },
+        "category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Exact category filter, e.g. 'Household Cleaning'.",
+          "title": "Category"
+        },
+        "brand": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Brand filter (case-insensitive).",
+          "title": "Brand"
+        },
+        "min_price": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Minimum price in USD.",
+          "title": "Min Price"
+        },
+        "max_price": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum price in USD.",
+          "title": "Max Price"
+        },
+        "min_rating": {
+          "anyOf": [
+            {
+              "maximum": 5,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Minimum star rating.",
+          "title": "Min Rating"
+        },
+        "exclude_ingredients": {
+          "description": "Drop products containing any of these.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Exclude Ingredients",
+          "type": "array"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "title": "RagSearchInput",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "RagProduct": {
+          "description": "One catalog product. Mirrors the columns of products.parquet.",
+          "properties": {
+            "doc_id": {
+              "description": "Stable citation ID, e.g. 'amz-000123'. Never changes between index rebuilds.",
+              "title": "Doc Id",
+              "type": "string"
+            },
+            "sku": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Original Amazon ID/ASIN if the dataset has one.",
+              "title": "Sku"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            },
+            "brand": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Brand"
+            },
+            "category": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Category"
+            },
+            "price": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Catalog price in USD. None if missing in the dataset.",
+              "title": "Price"
+            },
+            "size_value": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Package size, e.g. 16.0",
+              "title": "Size Value"
+            },
+            "size_unit": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Normalized unit, e.g. 'oz'.",
+              "title": "Size Unit"
+            },
+            "price_per_unit": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "price / size_value, for fair comparison.",
+              "title": "Price Per Unit"
+            },
+            "rating": {
+              "anyOf": [
+                {
+                  "maximum": 5,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Rating"
+            },
+            "ingredients": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "None means unknown, not 'no ingredients'.",
+              "title": "Ingredients"
+            },
+            "features_snippet": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Short excerpt used as evidence for the answer.",
+              "title": "Features Snippet"
+            },
+            "score": {
+              "description": "Retrieval relevance score (higher is better).",
+              "title": "Score",
+              "type": "number"
+            }
+          },
+          "required": [
+            "doc_id",
+            "title",
+            "score"
+          ],
+          "title": "RagProduct",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "query": {
+          "title": "Query",
+          "type": "string"
+        },
+        "filters_applied": {
+          "additionalProperties": true,
+          "title": "Filters Applied",
+          "type": "object"
+        },
+        "results": {
+          "items": {
+            "$ref": "#/$defs/RagProduct"
+          },
+          "title": "Results",
+          "type": "array"
+        },
+        "took_ms": {
+          "title": "Took Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "query",
+        "filters_applied",
+        "results",
+        "took_ms"
+      ],
+      "title": "RagSearchOutput",
+      "type": "object"
+    }
+  },
+  "web.search": {
+    "description": "Search the live web for current prices or availability. Use only when the user asks for current/latest/in-stock info or catalog data is missing.",
+    "inputSchema": {
+      "properties": {
+        "query": {
+          "description": "Search text, e.g. 'Brand X steel cleaner price'.",
+          "minLength": 1,
+          "title": "Query",
+          "type": "string"
+        },
+        "max_results": {
+          "default": 5,
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Max Results",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "title": "WebSearchInput",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "WebResult": {
+          "properties": {
+            "title": {
+              "title": "Title",
+              "type": "string"
+            },
+            "url": {
+              "description": "Source URL. Required: every live fact must be citable.",
+              "title": "Url",
+              "type": "string"
+            },
+            "snippet": {
+              "title": "Snippet",
+              "type": "string"
+            },
+            "source_domain": {
+              "description": "e.g. 'walmart.com'. Used for domain allow-listing.",
+              "title": "Source Domain",
+              "type": "string"
+            },
+            "price": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Parsed USD price if found in the result, else None.",
+              "title": "Price"
+            },
+            "availability": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "in_stock",
+                    "out_of_stock",
+                    "unknown"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Availability"
+            }
+          },
+          "required": [
+            "title",
+            "url",
+            "snippet",
+            "source_domain"
+          ],
+          "title": "WebResult",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "query": {
+          "title": "Query",
+          "type": "string"
+        },
+        "provider": {
+          "description": "'brave', 'serper', ...",
+          "title": "Provider",
+          "type": "string"
+        },
+        "cached": {
+          "description": "True if served from the TTL cache.",
+          "title": "Cached",
+          "type": "boolean"
+        },
+        "retrieved_at": {
+          "format": "date-time",
+          "title": "Retrieved At",
+          "type": "string"
+        },
+        "results": {
+          "items": {
+            "$ref": "#/$defs/WebResult"
+          },
+          "title": "Results",
+          "type": "array"
+        }
+      },
+      "required": [
+        "query",
+        "provider",
+        "cached",
+        "retrieved_at",
+        "results"
+      ],
+      "title": "WebSearchOutput",
+      "type": "object"
+    }
+  }
+}
