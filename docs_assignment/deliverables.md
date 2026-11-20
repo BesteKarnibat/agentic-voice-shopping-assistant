@@ -4,7 +4,7 @@ What we have to hand in, who owns each piece, and how we know it is done.
 Actionable version of [assignment.md](assignment.md). If the two disagree, `assignment.md` wins.
 Task order, handoffs, and branches are in [task-planning.md](task-planning.md).
 
-**Deadline: Monday, November 30, 2026.** Feature freeze: Saturday, November 28.
+**Official deadline: Wednesday, December 2, 2026.** Internal target: repo ready on Monday, November 30, then a full-team test and rehearsal on Tuesday, December 1. Feature freeze: Saturday, November 28.
 
 The project is finished when these two deliverables are done:
 
@@ -188,7 +188,7 @@ Alekhya runs the live demo on the Streamlit UI.
 - [ ] Demo runs end to end by voice: mic → transcript → step log → comparison table → citations → spoken answer
 - [ ] Laptop and microphone chosen and tested in the demo room
 - [ ] Recorded backup video, in case an API fails live
-- [ ] Rehearsal with the whole team on Tuesday Dic 1
+- [ ] Rehearsal with the whole team on Tuesday, Dec 1
 
 ### 2.2 Presentation (slides): Juan
 
