@@ -13,6 +13,28 @@ cp .env.example .env     # then fill in your own secrets
 
 - Add a dependency with `uv add <package>` (never `pip install`). Commit both `pyproject.toml` and `uv.lock`.
 - Run anything inside the project environment with `uv run <command>`.
+- `uv sync` also installs this repo's own packages (`contracts`, `config`) in editable mode, so they import
+  from any working directory (doit, `streamlit run`, the MCP server, `scripts/`).
+
+## Paths
+
+Every file and folder the project reads or writes is defined once in [config/paths.py](config/paths.py).
+Import from there instead of writing paths by hand:
+
+```python
+from config.paths import PRODUCTS_PARQUET, INDEX_DIR
+```
+
+| Constant | Path | Written by |
+|----------|------|------------|
+| `KAGGLE_DIR` | `data/raw/kaggle/` | download (`uv run doit download`) |
+| `PRODUCTS_PARQUET` | `data/processed/products.parquet` | preprocessing (Data & RAG) |
+| `REVIEWS_PARQUET` | `data/processed/reviews.parquet` | preprocessing, optional (Data & RAG) |
+| `INDEX_DIR` | `data/index/` | index build (Data & RAG); read by the MCP server |
+| `LOGS_DIR` | `data/logs/` | tool-call logs (MCP) |
+| `AUDIO_DIR` | `data/audio/` | recordings and TTS output (Voice & UI) |
+
+Everything under `data/` is gitignored. If you need a new path, add it to `config/paths.py` in the same PR that first uses it.
 
 ## Build tasks (pydoit)
 

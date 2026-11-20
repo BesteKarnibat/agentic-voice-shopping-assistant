@@ -26,10 +26,10 @@ from pathlib import Path
 import kagglehub
 from dotenv import load_dotenv
 
+from config.paths import ENV_FILE, KAGGLE_DIR, ROOT
+
 # Non-secret configuration. Override from the command line if needed.
-REPO_ROOT = Path(__file__).resolve().parents[1]
 DATASET_SLUG = "promptcloud/amazon-product-dataset-2020"
-KAGGLE_DIR = REPO_ROOT / "data" / "raw" / "kaggle"
 
 log = logging.getLogger("download_data")
 
@@ -66,12 +66,12 @@ def main() -> None:
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    load_dotenv(REPO_ROOT / ".env")
+    load_dotenv(ENV_FILE)
     check_credentials()
 
     folder = download(args.slug, KAGGLE_DIR, args.force)
     csv_path = find_csv(folder)
-    log.info("Downloaded %s", csv_path.relative_to(REPO_ROOT))
+    log.info("Downloaded %s", csv_path.relative_to(ROOT))
 
 
 if __name__ == "__main__":

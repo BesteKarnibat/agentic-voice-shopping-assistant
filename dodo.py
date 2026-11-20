@@ -7,13 +7,14 @@
 
 doit skips a task when its targets exist and its file_dep have not changed.
 Add new steps (preprocess, index, app, ...) here as tasks instead of ad-hoc scripts.
+Take every input and output path from config/paths.py.
 """
 
 import shutil
 import sys
-from pathlib import Path
 
-ROOT = Path(__file__).parent
+from config.paths import KAGGLE_DIR, ROOT
+
 PYTHON = sys.executable  # the uv venv interpreter, since doit runs via `uv run doit`
 
 DOIT_CONFIG = {
@@ -25,11 +26,10 @@ DOIT_CONFIG = {
 def task_download():
     """Download the Amazon Product Dataset 2020 (raw CSV) from Kaggle."""
     script = ROOT / "scripts" / "download_data.py"
-    kaggle_dir = ROOT / "data" / "raw" / "kaggle"
     return {
         "actions": [f'"{PYTHON}" "{script}"'],
         "file_dep": [script],
         # The CSV sits in nested subfolders, so check for it instead of listing a fixed target.
-        "uptodate": [lambda: any(kaggle_dir.rglob("*.csv"))],
-        "clean": [lambda: shutil.rmtree(kaggle_dir, ignore_errors=True)],
+        "uptodate": [lambda: any(KAGGLE_DIR.rglob("*.csv"))],
+        "clean": [lambda: shutil.rmtree(KAGGLE_DIR, ignore_errors=True)],
     }
