@@ -39,12 +39,8 @@ The private catalog is the [Amazon Product Dataset 2020](https://www.kaggle.com/
    uv run doit download
    ```
 
-This runs [scripts/download_data.py](scripts/download_data.py), which writes:
+This runs [scripts/download_data.py](scripts/download_data.py), which saves the original files exactly as
+Kaggle ships them (one CSV, ~10k products) under `data/raw/kaggle/`.
 
-| Path | Contents |
-|------|----------|
-| `data/raw/kaggle/` | Original files exactly as Kaggle ships them (one CSV, ~10k products) |
-| `data/raw/amazon_products_2020.parquet` | Same rows, columns renamed to snake_case, all values kept as strings |
-
-`data/` is gitignored. This step does no cleaning. Preprocessing into `products.parquet` is a separate step.
-To download again from scratch, delete `data/raw/` and run `uv run doit download` again.
+`data/` is gitignored. This step only downloads. Preprocessing into `products.parquet` is a separate step.
+To download again from scratch, run `uv run doit clean download && uv run doit download`.

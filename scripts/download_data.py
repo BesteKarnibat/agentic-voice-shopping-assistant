@@ -1,14 +1,13 @@
-"""Download the Amazon Product Dataset 2020 from Kaggle and save it as parquet.
+"""Download the Amazon Product Dataset 2020 from Kaggle.
 
 Credentials come from `.env` (never committed):
     KAGGLE_API_TOKEN=...   # kaggle.com -> Settings -> API -> Generate New Token
 
-Output (all under data/, which is gitignored):
-    data/raw/kaggle/...                    original files exactly as Kaggle ships them
-    data/raw/amazon_products_2020.parquet  same rows, columns renamed to snake_case, all values as strings
+Output (under data/, which is gitignored):
+    data/raw/kaggle/...    original files exactly as Kaggle ships them (one CSV)
 
-This step does no cleaning. Type casting, filtering, and the `products.parquet` schema belong
-to the preprocessing step (Data & RAG).
+This step only downloads. Reading the CSV, type casting, filtering, and writing `products.parquet`
+belong to the preprocessing step (Data & RAG).
 
 Usage:
     uv run doit download                       # preferred
@@ -21,27 +20,18 @@ from __future__ import annotations
 import argparse
 import logging
 import os
-import re
 import sys
 from pathlib import Path
 
 import kagglehub
-import polars as pl
 from dotenv import load_dotenv
 
 # Non-secret configuration. Override from the command line if needed.
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DATASET_SLUG = "promptcloud/amazon-product-dataset-2020"
-RAW_DIR = REPO_ROOT / "data" / "raw"
-KAGGLE_DIR = RAW_DIR / "kaggle"
-OUTPUT_PARQUET = RAW_DIR / "amazon_products_2020.parquet"
+KAGGLE_DIR = REPO_ROOT / "data" / "raw" / "kaggle"
 
 log = logging.getLogger("download_data")
-
-
-def to_snake_case(name: str) -> str:
-    """'Uniq Id' -> 'uniq_id', 'Upc Ean Code' -> 'upc_ean_code'."""
-    return re.sub(r"[^0-9a-zA-Z]+", "_", name).strip("_").lower()
 
 
 def check_credentials() -> None:
@@ -69,19 +59,9 @@ def find_csv(folder: Path) -> Path:
     return csvs[0]
 
 
-def csv_to_parquet(csv_path: Path, parquet_path: Path) -> pl.DataFrame:
-    """Read every column as a string (no type guessing) and write it as parquet."""
-    df = pl.read_csv(csv_path, infer_schema=False)
-    df = df.rename({c: to_snake_case(c) for c in df.columns})
-    parquet_path.parent.mkdir(parents=True, exist_ok=True)
-    df.write_parquet(parquet_path)
-    return df
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--slug", default=DATASET_SLUG, help="Kaggle dataset handle (owner/name)")
-    parser.add_argument("--output", type=Path, default=OUTPUT_PARQUET, help="Parquet file to write")
     parser.add_argument("--force", action="store_true", help="Download again even if the files exist")
     args = parser.parse_args()
 
@@ -91,8 +71,7 @@ def main() -> None:
 
     folder = download(args.slug, KAGGLE_DIR, args.force)
     csv_path = find_csv(folder)
-    df = csv_to_parquet(csv_path, args.output)
-    log.info("Wrote %s (%d rows x %d columns)", args.output.relative_to(REPO_ROOT), df.height, df.width)
+    log.info("Downloaded %s", csv_path.relative_to(REPO_ROOT))
 
 
 if __name__ == "__main__":
