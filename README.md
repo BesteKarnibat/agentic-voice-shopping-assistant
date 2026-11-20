@@ -27,7 +27,8 @@ from config.paths import PRODUCTS_PARQUET, INDEX_DIR
 
 | Constant | Path | Written by |
 |----------|------|------------|
-| `KAGGLE_DIR` | `data/raw/kaggle/` | download (`uv run doit download`) |
+| `KAGGLE_DIR` | `data/raw/kaggle/` | download (`uv run doit download_kaggle_dataset`) |
+| `KAGGLE_CSV` | `data/raw/kaggle/home/sdf/marketing_sample_…_10k_data.csv` | download; read by preprocessing |
 | `PRODUCTS_PARQUET` | `data/processed/products.parquet` | preprocessing (Data & RAG) |
 | `REVIEWS_PARQUET` | `data/processed/reviews.parquet` | preprocessing, optional (Data & RAG) |
 | `INDEX_DIR` | `data/index/` | index build (Data & RAG); read by the MCP server |
@@ -58,11 +59,11 @@ The private catalog is the [Amazon Product Dataset 2020](https://www.kaggle.com/
    ```
 3. Run the download task:
    ```bash
-   uv run doit download
+   uv run doit download_kaggle_dataset
    ```
 
 This runs [scripts/download_data.py](scripts/download_data.py), which saves the original files exactly as
 Kaggle ships them (one CSV, ~10k products) under `data/raw/kaggle/`.
 
 `data/` is gitignored. This step only downloads. Preprocessing into `products.parquet` is a separate step.
-To download again from scratch, run `uv run doit clean download && uv run doit download`.
+To download again from scratch, run `uv run doit clean download_kaggle_dataset && uv run doit download_kaggle_dataset`.

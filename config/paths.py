@@ -20,6 +20,7 @@ DATA_DIR = ROOT / "data"
 # Raw download (scripts/download_data.py)
 RAW_DIR = DATA_DIR / "raw"
 KAGGLE_DIR = RAW_DIR / "kaggle"  # original files exactly as Kaggle ships them
+KAGGLE_CSV = KAGGLE_DIR / "home" / "sdf" / "marketing_sample_for_amazon_com-ecommerce__20200101_20200131__10k_data.csv"
 
 # Preprocessing output (Data & RAG)
 PROCESSED_DIR = DATA_DIR / "processed"

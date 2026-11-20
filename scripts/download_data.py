@@ -4,13 +4,14 @@ Credentials come from `.env` (never committed):
     KAGGLE_API_TOKEN=...   # kaggle.com -> Settings -> API -> Generate New Token
 
 Output (under data/, which is gitignored):
-    data/raw/kaggle/...    original files exactly as Kaggle ships them (one CSV)
+    data/raw/kaggle/...    original files exactly as Kaggle ships them
+    KAGGLE_CSV             the one CSV inside (path defined in config/paths.py)
 
 This step only downloads. Reading the CSV, type casting, filtering, and writing `products.parquet`
 belong to the preprocessing step (Data & RAG).
 
 Usage:
-    uv run doit download                       # preferred
+    uv run doit download_kaggle_dataset        # preferred
     uv run python scripts/download_data.py     # same thing, without doit
     uv run python scripts/download_data.py --force
 """
@@ -26,7 +27,7 @@ from pathlib import Path
 import kagglehub
 from dotenv import load_dotenv
 
-from config.paths import ENV_FILE, KAGGLE_DIR, ROOT
+from config.paths import ENV_FILE, KAGGLE_CSV, KAGGLE_DIR, ROOT
 
 # Non-secret configuration. Override from the command line if needed.
 DATASET_SLUG = "promptcloud/amazon-product-dataset-2020"
@@ -43,20 +44,21 @@ def check_credentials() -> None:
         )
 
 
-def download(slug: str, dest: Path, force: bool) -> Path:
+def download(slug: str, dest: Path, force: bool) -> None:
     """Download and unzip the dataset into `dest`. Skips the download if it is already there."""
     dest.mkdir(parents=True, exist_ok=True)
     log.info("Downloading %s into %s", slug, dest)
-    path = kagglehub.dataset_download(slug, output_dir=str(dest), force_download=force)
-    return Path(path)
+    kagglehub.dataset_download(slug, output_dir=str(dest), force_download=force)
 
 
-def find_csv(folder: Path) -> Path:
-    """Return the single CSV in the download. Kaggle nests it in subfolders, so search recursively."""
-    csvs = sorted(folder.rglob("*.csv"))
-    if len(csvs) != 1:
-        raise RuntimeError(f"Expected exactly one CSV under {folder}, found {len(csvs)}: {csvs}")
-    return csvs[0]
+def check_csv() -> None:
+    """Fail clearly if the download did not produce the CSV that config/paths.py expects."""
+    if not KAGGLE_CSV.exists():
+        found = [str(p.relative_to(ROOT)) for p in sorted(KAGGLE_DIR.rglob("*.csv"))]
+        raise RuntimeError(
+            f"Expected {KAGGLE_CSV.relative_to(ROOT)} after the download, found: {found}. "
+            "If Kaggle changed the file name, update KAGGLE_CSV in config/paths.py."
+        )
 
 
 def main() -> None:
@@ -69,9 +71,9 @@ def main() -> None:
     load_dotenv(ENV_FILE)
     check_credentials()
 
-    folder = download(args.slug, KAGGLE_DIR, args.force)
-    csv_path = find_csv(folder)
-    log.info("Downloaded %s", csv_path.relative_to(ROOT))
+    download(args.slug, KAGGLE_DIR, args.force)
+    check_csv()
+    log.info("Downloaded %s", KAGGLE_CSV.relative_to(ROOT))
 
 
 if __name__ == "__main__":
