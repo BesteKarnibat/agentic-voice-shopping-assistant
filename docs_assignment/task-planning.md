@@ -16,13 +16,13 @@ Requirements are in [deliverables.md](deliverables.md). The original assignment 
 Added after the original plan (Nov 20):
 
 - **Presentation + demo:** Juan builds the slides. Alekhya owns the live demo on the UI (script, backup video, rehearsal).
-- **`prompts/` disclosure:** Devanshu (Router, Planner, Retriever) and Beste (Answerer, Critic, guardrails).
+- `prompts/` **disclosure:** Devanshu (Router, Planner, Retriever) and Beste (Answerer, Critic, guardrails).
 - **Run orchestration:** Devanshu, as integrator. pydoit is suggested.
 
 ## Schedule
 
 Thanksgiving is Thursday, November 26, and no work is planned that day.
-The plan's Days 1–11 are compressed into Nov 21–29. Bold rows are milestones that must not slip.
+The plan's Days 1–11 are compressed into Nov 21–30. Dec 1–2 are the team test and the official deadline. Bold rows are milestones that must not slip.
 
 | Date | Plan day | Milestone | Done when |
 |------|----------|-----------|-----------|
@@ -35,12 +35,14 @@ The plan's Days 1–11 are compressed into Nov 21–29. Bold rows are milestones
 | Thu Nov 26 | — | Thanksgiving | — |
 | Fri Nov 27 | 6–7 | Voice integration | Mic → ASR → graph → TTS → UI works end to end |
 | **Sat Nov 28** | 8 | **Feature freeze + first ProofAgent run** | No new features after this; Beste reports failures to owners |
-| Sun Nov 29 | 9 | Fix loop + submission prep | Second ProofAgent run, scorecard, failure analysis, README, `prompts/`, slides, demo rehearsal |
-| **Mon Nov 30** | 10 | **Submission / demo** | — |
+| Sun Nov 29 | 9 | Fix loop + submission prep | Second ProofAgent run, scorecard, failure analysis, README, `prompts/`, slides |
+| **Mon Nov 30** | 10 | **Repo ready (internal target)** | Everything merged into `main`; clean-machine test passes; slides and backup video done |
+| Tue Dec 1 | — | Full-team test and rehearsal | Whole team rehearses the ≤7-min session on the final repo; only critical fixes |
+| **Wed Dec 2** | — | **Official deadline** | Submission / demo |
 
 ## Critical path
 
-**Akshaj's index → Juan's `rag.search` → Devanshu's Retriever → Beste's answer quality → full ProofAgent evaluation**
+**Akshaj's index → Juan's** `rag.search` **→ Devanshu's Retriever → Beste's answer quality → full ProofAgent evaluation**
 
 Akshaj ships a rough v0 of the search by Day 3–4 and improves it afterward.
 
@@ -54,7 +56,7 @@ Akshaj ships a rough v0 of the search by Day 3–4 and improves it afterward.
 
 ## Handoff points
 
-"Plan day" is from the original plan. "Target date" compresses it to fit the deadline (Mon Nov 30, 2026) around Thanksgiving. See the full [schedule](#schedule).
+"Plan day" is from the original plan. "Target date" compresses it to fit the internal target (repo ready Mon Nov 30, 2026; official deadline Wed Dec 2) around Thanksgiving. See the full [schedule](#schedule).
 
 | Plan day | Target date | Who hands off | To whom | What |
 |----------|-------------|---------------|---------|------|
@@ -91,21 +93,3 @@ Akshaj ships a rough v0 of the search by Day 3–4 and improves it afterward.
 | `feature/eval` | Beste |
 
 Everyone merges into `main` through pull requests that Devanshu reviews.
-
-## Workload estimate
-
-Rough estimates made on Nov 20 to balance the load. Each one covers building, testing, the owner's own docs, and fix-loop time.
-They are not commitments. Update them if reality disagrees.
-
-| Owner | Main work | Est. hours |
-|-------|-----------|-----------:|
-| Akshaj | Kaggle script (1–2), cleaning + slice + parquet (4–6), ingredients + price-per-unit (3–4), embeddings + index (2–3), hybrid search (3–4), RAG eval/tuning (3–4), docs + fixes (3–5) | **20–28** |
-| Juan | `web.search` wrapper (2–3), cache + rate limit (2), logging (1–2), MCP server + discovery (2–3), `rag.search` wiring (1), tests (2), MCP README (1–2), fixes (2) | **13–17** |
-| Devanshu | Graph skeleton + `run_agent` (3–4), Router (3–4), Planner (3), Retriever + MCP client (3–4), reconciliation (3–4), model-agnostic LLM config (2), integration lead (6–8), PR reviews (3–4), orchestration (2–3), prompts (1–2) | **29–38** |
-| Alekhya | Whisper (2–3), TTS (2), Streamlit app (6–8), wiring to `run_agent` (2), polish (2–3), help with ProofAgent scenarios (2–3), fixes (2–3) | **18–24** |
-| Beste | Answerer (3–4), Critic (3–4), guardrails (3–4), learn ProofAgent (3–4), scenarios + adversarial cases (4–6), ProofAgent integration + runs (5–7), failure analysis (3–4), prompts (1–2) | **25–35** |
-
-Presentation + demo is about **8–10 h**: slides (4–6), demo script + recorded backup video (2–3), rehearsal (1–2).
-
-Juan has the lightest load and the MCP work is done by Tue Nov 24, so Juan builds the slides.
-Alekhya owns the live demo, since the demo runs on the UI Alekhya builds. The whole team rehearses on Sun Nov 29.
