@@ -218,3 +218,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project data: raw downloads, processed parquet, vector indexes (rebuilt by `uv run doit`)
+data/
+
+# pydoit state
+.doit.db*
