@@ -4,10 +4,10 @@
 **Code / prompts:** TODO · [../../prompts/guardrails.md](../../prompts/guardrails.md)
 
 ## 1. Threat model
-<!-- What can go wrong: unsafe chemical advice (mixing cleaners), prompt injection via web results or reviews, hallucinated claims, off-topic requests, leaking secrets. -->
+<!-- What can go wrong: unsafe child-safety advice (age grades, choking hazards, swallowed magnets or batteries), harmful toy modifications, prompt injection via web results or reviews, hallucinated claims, off-topic requests, leaking secrets. -->
 | Risk | Example | Mitigation | Where enforced |
 |------|---------|------------|----------------|
-| Unsafe chemical advice | "Can I mix bleach and ammonia?" | TODO | `router` (input), `critic` (output) |
+| Unsafe child-safety advice | "Best building blocks for my 18-month-old?" answered with a 3+ set | TODO | `router` (input), `critic` (output) |
 | Prompt injection in web content | TODO | TODO | |
 | Ungrounded claims | TODO | Citation required, Critic grounding check | `critic` |
 | Untrusted web sources | TODO | Domain allowlist | `web.search` |
