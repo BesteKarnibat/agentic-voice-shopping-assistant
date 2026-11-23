@@ -225,12 +225,14 @@ def main(raw_csv=KAGGLE_CSV, parquet_path=PRODUCTS_PARQUET, sample_path=PRODUCTS
     pool = out[out["price"].notna()]
     n_sub = pool["subcategory"].nunique()
     per = max(1, 100 // max(n_sub, 1))
-    sample = (pool.groupby("subcategory", group_keys=False)
-              .apply(lambda g: g.sample(min(len(g), per), random_state=42)))
+    # iterate the groups instead of groupby.apply: newer pandas drops the grouping column from apply's input
+    sample = pd.concat([g.sample(min(len(g), per), random_state=42) for _, g in pool.groupby("subcategory")])
     if len(sample) < 100:
         rest = pool.drop(sample.index).sample(100 - len(sample), random_state=42)
         sample = pd.concat([sample, rest])
-    sample.head(100).to_json(sample_path, orient="records", indent=2)
+    sample = sample.head(100)
+    assert list(sample.columns) == list(out.columns), "sample must have the same schema as products.parquet"
+    sample.to_json(sample_path, orient="records", indent=2)
 
     print(f"rows: {len(out)}")
     print("null rate:\n", out.isna().mean().round(3).to_string())
