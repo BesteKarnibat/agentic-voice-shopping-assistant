@@ -1,0 +1,346 @@
+[
+  {
+    "id": "K1",
+    "type": "known_item",
+    "query": "die-cast Ford F-150 pickup from Fast and Furious, 1:24 scale",
+    "filters": {},
+    "expected_doc_ids": [
+      "39478c1f7ef6ebefe5b8e7fb39b47a8e"
+    ]
+  },
+  {
+    "id": "K2",
+    "type": "known_item",
+    "query": "realistic black raven bird hand puppet for storytelling",
+    "filters": {},
+    "expected_doc_ids": [
+      "064737e60f15ace354b84578f8a02991"
+    ]
+  },
+  {
+    "id": "K3",
+    "type": "known_item",
+    "query": "300 piece jigsaw puzzle with a pet park scene for kids",
+    "filters": {},
+    "expected_doc_ids": [
+      "7216fbdb76fd0d1cc445e6c421ee83a2"
+    ]
+  },
+  {
+    "id": "K4",
+    "type": "known_item",
+    "query": "palm grip crayons for toddlers",
+    "filters": {},
+    "expected_doc_ids": [
+      "58376b12f46c114594192b81a9f6d0ec"
+    ]
+  },
+  {
+    "id": "K5",
+    "type": "known_item",
+    "query": "16 inch squishy pegasus plush",
+    "filters": {},
+    "expected_doc_ids": [
+      "66f55d694e2b1ac64da7e9fe7f838dfd"
+    ]
+  },
+  {
+    "id": "K6",
+    "type": "known_item",
+    "query": "tangle-free toy parachute with no strings",
+    "filters": {},
+    "expected_doc_ids": [
+      "b3c9b4a7dfcfb24667130f6be0001e74"
+    ]
+  },
+  {
+    "id": "K7",
+    "type": "known_item",
+    "query": "red 18 pocket side loading binder pages for trading cards",
+    "filters": {},
+    "expected_doc_ids": [
+      "143e8840a8978faa7bd2a39151259bfd"
+    ]
+  },
+  {
+    "id": "K8",
+    "type": "known_item",
+    "query": "100 piece glitter jigsaw puzzle of little mermaids",
+    "filters": {},
+    "expected_doc_ids": [
+      "18fb4d624ff2aad0986cc68ae0159f1c"
+    ]
+  },
+  {
+    "id": "K9",
+    "type": "known_item",
+    "query": "Frozen 2 sleepover set with three pieces for kids",
+    "filters": {},
+    "expected_doc_ids": [
+      "f3867d3e077a73f9fec7fe48f1196e60"
+    ]
+  },
+  {
+    "id": "K10",
+    "type": "known_item",
+    "query": "wooden stacking toy with the very hungry caterpillar",
+    "filters": {},
+    "expected_doc_ids": [
+      "87b4aeef3e34eaf192a60d1bacd224ba"
+    ]
+  },
+  {
+    "id": "K11",
+    "type": "known_item",
+    "query": "Fortnite edition of Monopoly for ages 13 and up",
+    "filters": {},
+    "expected_doc_ids": [
+      "3e6eb5e1433153c8c898335e7df0f676"
+    ]
+  },
+  {
+    "id": "K12",
+    "type": "known_item",
+    "query": "Hot Wheels die-cast Nissan Skyline R33 car",
+    "filters": {},
+    "expected_doc_ids": [
+      "53d2db2696a0c456d57dfc7f06270dc4"
+    ]
+  },
+  {
+    "id": "K13",
+    "type": "known_item",
+    "query": "wooden fishing game with magnetic rods for counting",
+    "filters": {},
+    "expected_doc_ids": [
+      "bb76b32ea44236be448f1a94c8964efd"
+    ]
+  },
+  {
+    "id": "K14",
+    "type": "known_item",
+    "query": "rocks and fossils science kit with real geodes, 200 pieces",
+    "filters": {},
+    "expected_doc_ids": [
+      "438f30057649c5ed4bc8682013f60dd9"
+    ]
+  },
+  {
+    "id": "K15",
+    "type": "known_item",
+    "query": "interactive llama pet toy that makes sounds and moves",
+    "filters": {},
+    "expected_doc_ids": [
+      "5d2bc035186410feb8a74d3e8b177dfa"
+    ]
+  },
+  {
+    "id": "K16",
+    "type": "known_item",
+    "query": "soft cloth baby book about shapes by Lamaze",
+    "filters": {},
+    "expected_doc_ids": [
+      "32ecd9657e844591be060bf71c35a366"
+    ]
+  },
+  {
+    "id": "C1",
+    "type": "constraint",
+    "query": "birthday party decorations",
+    "filters": {
+      "max_price": 10
+    },
+    "check": {
+      "max_price": 10
+    },
+    "relevance_keywords": [
+      "party",
+      "birthday",
+      "balloon",
+      "decor",
+      "banner"
+    ]
+  },
+  {
+    "id": "C2",
+    "type": "constraint",
+    "query": "jigsaw puzzle",
+    "filters": {
+      "brand": "Ravensburger"
+    },
+    "check": {
+      "brand": "Ravensburger"
+    },
+    "relevance_keywords": [
+      "puzzle"
+    ]
+  },
+  {
+    "id": "C3",
+    "type": "constraint",
+    "query": "soft plush toy for a newborn",
+    "filters": {
+      "child_age_years": 0.5
+    },
+    "check": {
+      "child_age_years": 0.5
+    },
+    "relevance_keywords": [
+      "plush",
+      "soft",
+      "stuffed",
+      "baby",
+      "rattle"
+    ]
+  },
+  {
+    "id": "C4",
+    "type": "constraint",
+    "query": "action figure",
+    "filters": {
+      "min_price": 20,
+      "max_price": 35
+    },
+    "check": {
+      "min_price": 20,
+      "max_price": 35
+    },
+    "relevance_keywords": [
+      "figure",
+      "action"
+    ]
+  },
+  {
+    "id": "C5",
+    "type": "constraint",
+    "query": "building blocks for kids",
+    "filters": {
+      "exclude_features": [
+        "small parts"
+      ]
+    },
+    "check": {
+      "exclude_features": [
+        "small parts"
+      ]
+    },
+    "relevance_keywords": [
+      "block",
+      "build",
+      "brick"
+    ]
+  },
+  {
+    "id": "C6",
+    "type": "constraint",
+    "query": "educational brain game",
+    "filters": {
+      "category": "Puzzles"
+    },
+    "check": {
+      "subcategory": "Puzzles"
+    },
+    "relevance_keywords": [
+      "puzzle",
+      "game",
+      "brain",
+      "maze",
+      "educat"
+    ]
+  },
+  {
+    "id": "C7",
+    "type": "constraint",
+    "query": "board game for a pre-teen",
+    "filters": {
+      "max_price": 30,
+      "child_age_years": 12
+    },
+    "check": {
+      "max_price": 30,
+      "child_age_years": 12
+    },
+    "relevance_keywords": [
+      "game",
+      "board",
+      "card",
+      "puzzle"
+    ]
+  },
+  {
+    "id": "C8",
+    "type": "constraint",
+    "query": "stuffed animal",
+    "filters": {
+      "brand": "Aurora World",
+      "max_price": 20
+    },
+    "check": {
+      "brand": "Aurora World",
+      "max_price": 20
+    },
+    "relevance_keywords": [
+      "plush",
+      "stuffed",
+      "animal",
+      "bear",
+      "pillow"
+    ]
+  },
+  {
+    "id": "E1",
+    "type": "edge",
+    "query": "toy",
+    "filters": {
+      "brand": "NotABrand"
+    },
+    "expect": "expect_empty",
+    "note": "Unknown brand must return no results, not an error or a guess."
+  },
+  {
+    "id": "E2",
+    "type": "edge",
+    "query": "anything",
+    "filters": {
+      "max_price": 0.0
+    },
+    "expect": "expect_empty",
+    "note": "Impossible budget must return no results."
+  },
+  {
+    "id": "E3",
+    "type": "edge",
+    "query": "stuffed animal",
+    "filters": {
+      "min_rating": 4.5
+    },
+    "expect": "expect_unsupported_flag",
+    "note": "min_rating cannot be applied (no rating data); it must be reported in filters_applied, not silently ignored."
+  },
+  {
+    "id": "E4",
+    "type": "edge",
+    "query": "PlayStation 5 console",
+    "filters": {},
+    "expect": "expect_low_score:0.45",
+    "note": "Product not in the catalog: the best match must score clearly low (<0.45). Caveat: short in-catalog queries can also score ~0.5, so score alone is a weak 'not found' signal."
+  },
+  {
+    "id": "E5",
+    "type": "edge",
+    "query": "something fun",
+    "filters": {},
+    "expect": "expect_results_no_crash",
+    "note": "Ambiguous request still returns results; recorded for the Planner/Answerer to handle."
+  },
+  {
+    "id": "E6",
+    "type": "edge",
+    "query": "LEGO set",
+    "filters": {
+      "child_age_years": 4
+    },
+    "expect": "expect_age_ok",
+    "note": "Age filter must not return products whose stated minimum age exceeds 4."
+  }
+]
