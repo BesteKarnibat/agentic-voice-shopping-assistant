@@ -56,7 +56,7 @@ Columns of `products.parquet`: `doc_id, sku, title, brand, brand_source, categor
 | `exclude_features` | text match on features and warnings, applied after retrieval |
 | `min_rating` | **not applied** (no data); reported in `filters_applied` as "not applied: catalog has no rating data" instead of silently dropping everything |
 
-**Scoring:** `cosine(query, product) + 0.3 * title_overlap` (share of the query's content words found in the title or brand). Candidates are the vector top-50 plus a BM25 top-30 on title and brand. No match returns an empty list, never an exception. `score` is for ordering only and can slightly exceed 1.0. Every result keeps its `doc_id` for citations.
+**Scoring:** `cosine(query, product) + 0.3 * title_overlap` (share of the query's content words found in the title or brand). Candidates are the vector top-50 plus a BM25 top-30 on title and brand. No match returns an empty list, never an exception; a blank query or `min_price` above `max_price` also returns empty, with the reason in `filters_applied`. `score` is for ordering only and can slightly exceed 1.0. Every result keeps its `doc_id` for citations.
 
 ## 7. Retrieval evaluation
 `uv run doit rag_smoke_test rag_eval`: 30 queries in [../../rag/eval/eval_queries.json](../../rag/eval/eval_queries.json): 16 known-item (one expected `doc_id` each), 8 constraint (every result must obey every filter, checked against the parquet), 6 edge cases (unknown brand, impossible budget, unsupported rating filter, product not in the catalog, ambiguous request, strict age filter). Report goes to `data/eval/EVAL_REPORT.md`.
@@ -70,6 +70,8 @@ Columns of `products.parquet`: `doc_id, sku, title, brand, brand_source, categor
 | Checks passed | 29/30 | 30/30 |
 | Latency p50 / p95 | ~20 / ~33 ms | ~25 / ~45 ms |
 
+**Held-out check:** 12 further known-item queries ([../../rag/eval/heldout_queries.json](../../rag/eval/heldout_queries.json)), written before running and not used for tuning: recall@1 0.92 → 1.00 and MRR 0.94 → 1.00 (vector only vs hybrid). They name brands or characters, so they are easier than the failure case below and do not test it.
+
 **Failure found (v0):** "300 piece jigsaw puzzle with a pet park scene for kids" did not return the Ravensburger Pet Park puzzle in the top 10, because other 300-piece puzzles outranked it (long marketing text dilutes the title in the embedding). The title/brand signal moved it to rank 3.
 
 ## 8. Decisions, limitations, and known issues
@@ -78,7 +80,8 @@ Columns of `products.parquet`: `doc_id, sku, title, brand, brand_source, categor
 - **No ratings:** the agent cannot rank by stars or cite a rating from private data. Could come from `web.search`.
 - **Warnings exist for 1.4% of products, age for 74%.** The Answerer must never call a toy safe because nothing was found.
 - **Brand is best-effort** for ~75% of products (first title word) and can truncate unlisted multi-word brands.
-- **Small evaluation:** the weight was tuned on the same 30 queries it is reported on, and one missed known-item query costs 6 points. Treat the numbers as indicative.
+- **Small evaluation:** the weight was tuned on the 30 queries above (the 12 held-out ones were not), and one missed known-item query costs 6 points. Treat the numbers as indicative.
+- **Prices are kept as scraped.** 4 products are under $1 (one at $0.01, likely a source glitch) and 30 over $500 (mostly swing sets; one $5,332 lab instrument filed under Toys & Games). None were edited or dropped; a budget filter handles them naturally.
 - Package size and price per unit (#40) are not built: PR #78 removed those fields.
 
 ## 9. Rebuild from scratch
@@ -86,6 +89,6 @@ Columns of `products.parquet`: `doc_id, sku, title, brand, brand_source, categor
 uv run doit download_kaggle_dataset   # raw CSV
 uv run doit preprocess                # products.parquet
 uv run doit index                     # Chroma index
-uv run doit rag_smoke_test rag_eval   # checks
+uv run doit rag_unit_test rag_smoke_test rag_eval   # 27 parser tests, filter checks, retrieval scores
 ```
 Needs `chromadb`, `sentence-transformers`, `pandas` and `pyarrow` in the project dependencies.

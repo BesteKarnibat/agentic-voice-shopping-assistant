@@ -138,6 +138,9 @@ def _build_where(inp: RagSearchInput, st: dict) -> tuple[dict | None, dict, bool
             applied["brand"] = f"{inp.brand} (no such brand)"
             impossible = True
 
+    if inp.min_price is not None and inp.max_price is not None and inp.min_price > inp.max_price:
+        applied["price"] = "min_price is above max_price: no product can match"
+        impossible = True
     if inp.min_price is not None:
         clauses.append({"price": {"$gte": inp.min_price}})
         applied["min_price"] = inp.min_price
@@ -165,6 +168,9 @@ def rag_search(inp: RagSearchInput) -> RagSearchOutput:
     t0 = time.perf_counter()
     st = _load()
     where, applied, impossible = _build_where(inp, st)
+    if not inp.query.strip():  # the contract only checks length, so "   " gets through
+        applied["query"] = "blank query: nothing to search for"
+        impossible = True
 
     if impossible:
         return RagSearchOutput(query=inp.query, filters_applied=applied, results=[],

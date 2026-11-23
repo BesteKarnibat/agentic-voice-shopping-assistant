@@ -67,11 +67,13 @@ def run(q, top_k):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--lam", type=float, default=None, help="override HYBRID_LAMBDA for this run")
+    parser.add_argument("--queries", default="eval_queries.json", help="query file inside rag/eval (default: eval_queries.json)")
     args = parser.parse_args()
     if args.lam is not None:
         retrieval.HYBRID_LAMBDA = args.lam
     RAG_EVAL_DIR.mkdir(parents=True, exist_ok=True)
-    queries = json.loads((HERE / "eval_queries.json").read_text())
+    queries = json.loads((HERE / args.queries).read_text())
+    tag = "" if args.queries == "eval_queries.json" else "_" + Path(args.queries).stem
     rag_search(RagSearchInput(query="warm up"))  # load model/index outside the timings
     results, latencies = [], []
 
@@ -114,44 +116,54 @@ def main():
     known = [r for r in results if r["type"] == "known_item"]
     cons = [r for r in results if r["type"] == "constraint"]
     edge = [r for r in results if r["type"] == "edge"]
-    summary = {
-        "known_item": {
+    def ratio(num, den):
+        return round(num / den, 2) if den else None
+
+    summary = {}
+    if known:
+        summary["known_item"] = {
             "n": len(known),
-            "recall@1": round(sum(r["rank"] == 1 for r in known) / len(known), 2),
-            "recall@5": round(sum(r["rank"] is not None and r["rank"] <= 5 for r in known) / len(known), 2),
-            "recall@10": round(sum(r["rank"] is not None for r in known) / len(known), 2),
-            "MRR": round(sum(1 / r["rank"] for r in known if r["rank"]) / len(known), 2),
-        },
-        "constraint": {
+            "recall@1": ratio(sum(r["rank"] == 1 for r in known), len(known)),
+            "recall@5": ratio(sum(r["rank"] is not None and r["rank"] <= 5 for r in known), len(known)),
+            "recall@10": ratio(sum(r["rank"] is not None for r in known), len(known)),
+            "MRR": ratio(sum(1 / r["rank"] for r in known if r["rank"]), len(known)),
+            "ranks": [r["rank"] for r in known],
+        }
+    if cons:
+        summary["constraint"] = {
             "n": len(cons),
-            "satisfaction": round(sum(r["violations"] == 0 and r["n_results"] > 0 for r in cons) / len(cons), 2),
+            "satisfaction": ratio(sum(r["violations"] == 0 and r["n_results"] > 0 for r in cons), len(cons)),
             "mean_relevance@5": round(statistics.mean(r["relevance_at_5"] for r in cons), 2),
             "passed": sum(r["passed"] for r in cons),
-        },
-        "edge": {"n": len(edge), "passed": sum(r["passed"] for r in edge)},
-        "latency_ms": {"p50": round(statistics.median(latencies)),
-                       "p95": round(sorted(latencies)[int(0.95 * (len(latencies) - 1))])},
-        "total_passed": f"{sum(r['passed'] for r in results)}/{len(results)}",
-    }
-    (RAG_EVAL_DIR / "eval_results.json").write_text(json.dumps({"summary": summary, "results": results}, indent=2, default=str))
+        }
+    if edge:
+        summary["edge"] = {"n": len(edge), "passed": sum(r["passed"] for r in edge)}
+    summary["latency_ms"] = {"p50": round(statistics.median(latencies)),
+                             "p95": round(sorted(latencies)[int(0.95 * (len(latencies) - 1))])}
+    summary["total_passed"] = f"{sum(r['passed'] for r in results)}/{len(results)}"
+    (RAG_EVAL_DIR / f"eval_results{tag}.json").write_text(json.dumps({"summary": summary, "results": results}, indent=2, default=str))
 
     # ---- report
     lines = ["# RAG evaluation report", "", f"Total passed: **{summary['total_passed']}**", "",
              "| Metric | Value |", "|---|---|"]
-    k, c = summary["known_item"], summary["constraint"]
-    lines += [f"| Known-item recall@1 / @5 / @10 | {k['recall@1']} / {k['recall@5']} / {k['recall@10']} |",
-              f"| Known-item MRR | {k['MRR']} |",
-              f"| Constraint satisfaction | {c['satisfaction']} |",
-              f"| Constraint mean relevance@5 | {c['mean_relevance@5']} |",
-              f"| Edge cases passed | {summary['edge']['passed']}/{summary['edge']['n']} |",
-              f"| Latency p50 / p95 (ms) | {summary['latency_ms']['p50']} / {summary['latency_ms']['p95']} |",
-              "", "| ID | Type | Query | Result |", "|---|---|---|---|"]
+    lines += [f"| Latency p50 / p95 (ms) | {summary['latency_ms']['p50']} / {summary['latency_ms']['p95']} |"]
+    if "known_item" in summary:
+        k = summary["known_item"]
+        lines += [f"| Known-item recall@1 / @5 / @10 | {k['recall@1']} / {k['recall@5']} / {k['recall@10']} |",
+                  f"| Known-item MRR | {k['MRR']} |"]
+    if "constraint" in summary:
+        c = summary["constraint"]
+        lines += [f"| Constraint satisfaction | {c['satisfaction']} |",
+                  f"| Constraint mean relevance@5 | {c['mean_relevance@5']} |"]
+    if "edge" in summary:
+        lines += [f"| Edge cases passed | {summary['edge']['passed']}/{summary['edge']['n']} |"]
+    lines += ["", "| ID | Type | Query | Result |", "|---|---|---|---|"]
     for r in results:
         detail = (f"rank {r['rank']}" if r["type"] == "known_item"
                   else f"viol {r['violations']}, rel@5 {r['relevance_at_5']}" if r["type"] == "constraint"
                   else f"n={r['n_results']}, top={r['top_score']}")
         lines.append(f"| {r['id']} | {r['type']} | {r['query']} | {'PASS' if r['passed'] else 'FAIL'} ({detail}) |")
-    (RAG_EVAL_DIR / "EVAL_REPORT.md").write_text("\n".join(lines) + "\n")
+    (RAG_EVAL_DIR / f"EVAL_REPORT{tag}.md").write_text("\n".join(lines) + "\n")
 
     print(json.dumps(summary, indent=2))
     for r in results:

@@ -12,6 +12,8 @@ CASES = [
     ("rating filter (unsupported)", dict(query="stuffed animal", min_rating=4.5, top_k=3)),
     ("unknown brand -> empty", dict(query="toy", brand="NotABrand")),
     ("child age 2", dict(query="toy for my toddler", child_age_years=2, top_k=8)),
+    ("blank query -> empty", dict(query="   ")),
+    ("min_price above max_price -> empty", dict(query="toy", min_price=50, max_price=10)),
     ("exclude small parts", dict(query="building blocks for kids", exclude_features=["small parts", "choking"], top_k=8)),
 ]
 
@@ -31,9 +33,9 @@ def main():
             failures += any(p.min_age_years is not None and p.min_age_years > 2 for p in out.results)
         if name == "exclude small parts":
             failures += any(p.safety_warnings and ("small parts" in p.safety_warnings or "choking hazard" in p.safety_warnings) for p in out.results)
-        if name == "unknown brand -> empty":
-            failures += bool(out.results)
-        if name != "unknown brand -> empty" and not out.results:
+        if name.endswith("-> empty"):
+            failures += bool(out.results) or not out.filters_applied  # empty AND explained
+        if not name.endswith("-> empty") and not out.results:
             failures += 1
     print("\nFAILED" if failures else "\nOK: all checks passed", failures or "")
     sys.exit(1 if failures else 0)
