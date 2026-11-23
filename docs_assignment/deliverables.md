@@ -53,8 +53,8 @@ Everything merges into `main` through a PR that Devanshu reviews.
 Turns a curated slice of the Amazon Product Dataset 2020 into a searchable private catalog.
 Contract: `RagSearchInput` / `RagProduct` in `contracts/tool_schemas.py`. Grading: **Agentic RAG Quality (20)**.
 
-- [ ] **[CP1]** Selected data slice: while analyzing the data, Akshaj picks the category to use. Confirm it has rating, ingredients, and reviews.
-- [ ] **Reminder: update the contracts once the category is chosen.** The `category` filter example in `contracts/tool_schemas.py` (`RagSearchInput.category`, line 26) still holds a placeholder category. Replace it with the chosen one, then regenerate the JSON from the repo root. `tool_schemas.py` is Juan's contract, so tell Juan before changing it.
+- [x] **[CP1]** Selected data slice: **Toys & Games**. Confirm it has rating, age range, safety warnings, and reviews.
+- [x] **Contracts updated for the chosen category** (`Constraints`, `RagSearchInput`, `RagProduct`, `ComparisonRow` now carry age and safety-warning fields). After any further change to `tool_schemas.py`, tell Juan and regenerate the JSON from the repo root:
   ```bash
   python -c "from contracts.tool_schemas import export_json_schemas; export_json_schemas('contracts/tool_schemas.json')"
   ```
@@ -62,11 +62,11 @@ Contract: `RagSearchInput` / `RagProduct` in `contracts/tool_schemas.py`. Gradin
 - [ ] **[CP2]** RAG evaluation plan: how retrieval quality will be measured (queries, expected products, metrics).
 - [ ] Kaggle download script that uses the user's own API key (no data committed)
 - [ ] Cleaning and the curated slice
-- [ ] `products.parquet` with `id, title, brand, category, price, rating, features, ingredients`
+- [ ] `products.parquet` with `id, title, brand, category, price, rating, features, min_age_years, max_age_years, safety_warnings`
 - [ ] `reviews.parquet` (optional) with `product_id, stars, summary/snippets`
-- [ ] Unit normalization where needed (e.g. price per ounce)
+- [ ] Age-range normalization: parse "3 years and up", "18 months+", "8-12 years" into `min_age_years` / `max_age_years`
 - [ ] Embeddings over title + features (+ description) + selected review snippets
-- [ ] Metadata stored: brand, price, rating, ingredients, category
+- [ ] Metadata stored: brand, price, rating, age range, safety warnings, category
 - [ ] Vector store: Chroma
 - [ ] **Hybrid retrieval:** vector similarity + metadata filters
 - [ ] Stable `doc_id` returned for citations
@@ -85,7 +85,7 @@ Contract: `contracts/tool_schemas.py` (Juan owns it). Grading: **MCP Server (15)
 - [ ] **One** MCP server exposing **two** tools: `rag.search` and `web.search`
 - [ ] Tool discovery, tool names, and JSON schemas
 - [ ] Transport: stdio or streamable HTTP/SSE
-- [ ] `rag.search` returns `{sku, title, price, rating, brand?, ingredients?, doc_id}`
+- [ ] `rag.search` returns `{sku, title, price, rating, brand?, min_age_years?, max_age_years?, safety_warnings?, doc_id}`
 - [ ] `web.search` wraps a legitimate API (Brave or Serper) and normalizes to `{title, url, snippet, price?, availability?}`
 - [ ] `web.search` rate limiting
 - [ ] `web.search` caching, TTL 60–300 s
@@ -105,7 +105,7 @@ Contract: `contracts/state.py` (Devanshu owns it). Grading: **Functionality (25,
 - [ ] **[CP2]** Architecture diagram of the whole system.
 - [ ] **[CP2]** LangGraph flow: nodes, edges, state, and the Critic revision loop.
 - [ ] Workflow built in **LangGraph**: Router → Planner → Retriever → Answerer/Critic
-- [ ] **Router:** classifies intent, extracts constraints (budget, material, brand, category, preferences), flags basic safety concerns
+- [ ] **Router:** classifies intent, extracts constraints (budget, child's age, number of players, brand, category, preferences), flags basic safety concerns
 - [ ] **Planner:** decides RAG, web, or both; defines retrieval fields and comparison criteria
 - [ ] Planner prefers `rag.search` for product facts; uses `web.search` only for "current / latest / in stock / current price" or when catalog data is missing
 - [ ] **Retriever:** vector search + metadata filters; calls the MCP tools when needed
@@ -130,7 +130,7 @@ Contract: `AgentState` input/output fields. Grading: **UI/UX (8)** and part of *
   - [ ] Mic recording / upload
   - [ ] Transcript
   - [ ] Agent execution / step log
-  - [ ] Product comparison table (top 3: Product | Price | Rating | Ingredients | Source | Citation)
+  - [ ] Product comparison table (top 3: Product | Price | Rating | Age range | Warnings | Source | Citation)
   - [ ] Citations with private `doc_id`s
   - [ ] Live-source links
   - [ ] TTS playback
@@ -146,7 +146,7 @@ Contract: `CriticVerdict`, `Citation`, `ComparisonRow`. Grading: **ProofAgent Ev
 - [ ] **Answerer:** concise recommendation; every factual product claim cites a private `doc_id` or a live `url`
 - [ ] **Critic:** checks grounding against evidence, safety, and response quality; at most `MAX_CRITIC_REVISIONS` (2) rewrites
 - [ ] Guardrails on input and output; grounded answers only, no unsupported claims
-- [ ] Safe handling of chemical/product advice (e.g. mixing cleaners)
+- [ ] Safe handling of child-safety advice (age grades, choking hazards, magnets, button batteries)
 - [ ] Real Answerer and Critic plugged into the graph by Wed Nov 25
 - [ ] **ProofAgent evaluation** of the end-to-end agent, not just the LLM:
   - [ ] Evaluation configuration
@@ -218,7 +218,7 @@ Items marked **Skipped** are a team decision: we do not produce them.
 |------|-------|-----------------|
 | One-page proposal | — | **Skipped** |
 | Problem definition | — | **Skipped** |
-| Selected data slice | Akshaj | Curated subset of the Amazon Product Dataset 2020, chosen by Akshaj |
+| Selected data slice | Akshaj | Toys & Games subset of the Amazon Product Dataset 2020 |
 | Proposed tools | Everyone | The README has a "Tools" section. Each owner adds the tools they use. Prefer tools that **uv** can manage (`uv add`), so the repo stays easy to work in. |
 | Data ingestion notebook | Juan | Instead of a notebook: an ingestion script plus a `dodo.py`, with the configuration documented in the README. It doubles as the example of how to use doit in this repo. |
 | Brief related work | — | **Skipped** |

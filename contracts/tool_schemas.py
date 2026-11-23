@@ -21,14 +21,15 @@ from pydantic import BaseModel, Field
 
 
 class RagSearchInput(BaseModel):
-    query: str = Field(..., min_length=1, description="Natural-language search text, e.g. 'eco-friendly stainless steel cleaner'.")
+    query: str = Field(..., min_length=1, description="Natural-language search text, e.g. 'cooperative board game for young kids'.")
     top_k: int = Field(5, ge=1, le=20, description="Number of products to return.")
-    category: Optional[str] = Field(None, description="Exact category filter, e.g. 'Household Cleaning'.")
+    category: Optional[str] = Field(None, description="Exact category filter, e.g. 'Toys & Games'.")
     brand: Optional[str] = Field(None, description="Brand filter (case-insensitive).")
     min_price: Optional[float] = Field(None, ge=0, description="Minimum price in USD.")
     max_price: Optional[float] = Field(None, ge=0, description="Maximum price in USD.")
     min_rating: Optional[float] = Field(None, ge=0, le=5, description="Minimum star rating.")
-    exclude_ingredients: list[str] = Field(default_factory=list, description="Drop products containing any of these.")
+    child_age_years: Optional[float] = Field(None, ge=0, description="Drop products whose minimum age is above this age.")
+    exclude_features: list[str] = Field(default_factory=list, description="Drop products whose warnings or features mention any of these, e.g. 'small parts', 'batteries'.")
 
 
 class RagProduct(BaseModel):
@@ -39,11 +40,10 @@ class RagProduct(BaseModel):
     brand: Optional[str] = None
     category: Optional[str] = None
     price: Optional[float] = Field(None, description="Catalog price in USD. None if missing in the dataset.")
-    size_value: Optional[float] = Field(None, description="Package size, e.g. 16.0")
-    size_unit: Optional[str] = Field(None, description="Normalized unit, e.g. 'oz'.")
-    price_per_unit: Optional[float] = Field(None, description="price / size_value, for fair comparison.")
     rating: Optional[float] = Field(None, ge=0, le=5)
-    ingredients: Optional[list[str]] = Field(None, description="None means unknown, not 'no ingredients'.")
+    min_age_years: Optional[float] = Field(None, ge=0, description="Manufacturer's recommended minimum age. None means not stated, not 'any age'.")
+    max_age_years: Optional[float] = Field(None, ge=0, description="Recommended maximum age, if stated.")
+    safety_warnings: Optional[list[str]] = Field(None, description="Warnings from the listing, e.g. 'choking hazard: small parts'. None means unknown, not 'no warnings'.")
     features_snippet: Optional[str] = Field(None, description="Short excerpt used as evidence for the answer.")
     score: float = Field(..., description="Retrieval relevance score (higher is better).")
 
@@ -61,7 +61,7 @@ class RagSearchOutput(BaseModel):
 
 
 class WebSearchInput(BaseModel):
-    query: str = Field(..., min_length=1, description="Search text, e.g. 'Brand X steel cleaner price'.")
+    query: str = Field(..., min_length=1, description="Search text, e.g. 'LEGO Classic 11001 price'.")
     max_results: int = Field(5, ge=1, le=10)
 
 

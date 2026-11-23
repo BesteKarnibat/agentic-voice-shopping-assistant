@@ -18,9 +18,9 @@ from typing import Annotated, Literal, Optional, TypedDict
 MAX_CRITIC_REVISIONS = 2  # Answerer gets at most 2 rewrites before we stop.
 
 Intent = Literal[
-    "product_search",      # "recommend a cleaner under $15"
+    "product_search",      # "recommend a board game under $30"
     "product_comparison",  # "compare X and Y"
-    "product_question",    # "does X contain bleach?"
+    "product_question",    # "does X have small parts?"
     "price_check",         # "what's the current price of X?"
     "unclear",             # needs a clarifying question
     "unsafe",              # refuse or redirect
@@ -35,16 +35,17 @@ class Constraints(TypedDict, total=False):
     budget_min: Optional[float]
     budget_max: Optional[float]
     brand: Optional[str]
-    surface: Optional[str]          # what it's used on, e.g. "stainless steel"
-    preferences: list[str]          # e.g. ["eco-friendly", "fragrance-free"]
-    exclude_ingredients: list[str]  # e.g. ["bleach", "ammonia"]
+    child_age_years: Optional[float]  # age of the child the product is for, e.g. 1.5. Hard constraint, like budget.
+    num_players: Optional[int]        # e.g. 4 for "a game for the four of us"
+    preferences: list[str]            # e.g. ["educational", "outdoor", "STEM"]
+    exclude_features: list[str]       # e.g. ["small parts", "batteries", "magnets"]
     min_rating: Optional[float]
     wants_current_info: bool        # user said "current", "latest", "in stock"...
 
 
 class SafetyCheck(TypedDict):
     is_safe: bool
-    category: Optional[str]  # e.g. "chemical_mixing", "ingestion", "prompt_injection"
+    category: Optional[str]  # one of the categories in prompts/guardrails.md, e.g. "injury_emergency", "child_safety"
     reason: Optional[str]
 
 
@@ -56,7 +57,7 @@ class Plan(TypedDict):
     rag_query: str
     rag_filters: dict              # becomes RagSearchInput fields
     web_query: Optional[str]
-    comparison_criteria: list[str] # e.g. ["price", "rating", "ingredients"]
+    comparison_criteria: list[str] # e.g. ["price", "rating", "age_range"]
     top_k: int
     reasoning: str                 # shown in the UI step log
 
@@ -97,7 +98,8 @@ class ComparisonRow(TypedDict):
     price: Optional[float]
     price_source: str
     rating: Optional[float]
-    ingredients: Optional[list[str]]
+    age_range: Optional[str]                # e.g. "3-8 years", "14+ years"; None if the source doesn't state it
+    safety_warnings: Optional[list[str]]    # as stated by the source, e.g. ["choking hazard: small parts"]
     doc_id: str
     live_url: Optional[str]
     citation_markers: list[str]
