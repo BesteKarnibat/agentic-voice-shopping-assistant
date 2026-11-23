@@ -6,7 +6,7 @@
     uv run doit clean download_kaggle_dataset   # delete a task's outputs so it runs again
     uv run doit preprocess                      # raw CSV -> products.parquet (Toys & Games slice)
     uv run doit index                           # products.parquet -> Chroma vector index
-    uv run doit rag_unit_test rag_smoke_test rag_eval   # parser tests, rag_search() checks, retrieval scores
+    uv run doit rag_unit_test rag_smoke_test rag_eval rag_sample_eval   # tests, checks, retrieval scores
 
 doit skips a task when its targets exist and its file_dep have not changed.
 Add new steps (preprocess, index, app, ...) here as tasks instead of ad-hoc scripts.
@@ -74,6 +74,11 @@ def task_rag_unit_test():
 def task_rag_smoke_test():
     """Run rag_search() on a few queries and fail if a filter is broken."""
     return {"actions": [f'"{PYTHON}" -m rag.smoke_test'], "file_dep": [CHROMA_DIR / "chroma.sqlite3"]}
+
+
+def task_rag_sample_eval():
+    """Retrieval recall on 600 random products with generated queries (about 3 min). Output: data/eval/random_sample_eval.md."""
+    return {"actions": [f'"{PYTHON}" -m rag.eval.random_sample_eval'], "file_dep": [CHROMA_DIR / "chroma.sqlite3"]}
 
 
 def task_rag_eval():

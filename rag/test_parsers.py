@@ -7,6 +7,7 @@ No index or raw data needed. Several cases are bugs found while building this (u
 import unittest
 
 from rag.preprocess import age_bounds, parse_age, parse_brand, parse_features, parse_price, parse_warnings
+from rag.eval.random_sample_eval import compact, make_queries, metrics
 from rag.search import _key, _tokens
 
 
@@ -127,6 +128,29 @@ class SearchHelperTests(unittest.TestCase):
         self.assertEqual(_tokens("puzzles"), ["puzzle"])
         self.assertEqual(_tokens("a puzzle for the kids"), ["puzzle"])  # 'kid' is a stopword too
         self.assertEqual(_tokens("glass"), ["glass"])  # double-s is not a plural
+
+
+class SampleEvalHelperTests(unittest.TestCase):
+    ROW = {"title": "Melissa & Doug Wooden Jigsaw Puzzle (24 pcs)", "brand": "Melissa & Doug",
+           "subcategory": "Puzzles", "features": ["Chunky wooden pieces for small hands", "Easy to clean"]}
+
+    def test_compact_drops_stopwords_and_caps_length(self):
+        self.assertEqual(compact("The best wooden puzzle for a kid", 10), "wooden puzzle")
+        self.assertEqual(len(compact("alpha beta gamma delta epsilon zeta eta", 3).split()), 3)
+
+    def test_feature_query_has_no_title_words(self):
+        q = make_queries(self.ROW)
+        self.assertNotIn("jigsaw", q["features"].lower())  # what makes it the unbiased query type
+
+    def test_title_no_brand_removes_the_brand(self):
+        q = make_queries(self.ROW)
+        self.assertNotIn("melissa", q["title_no_brand"].lower())
+        self.assertEqual(q["brand_subcat"], "Melissa & Doug Puzzles")
+
+    def test_metrics(self):
+        m = metrics([1, 2, None, 6])
+        self.assertEqual((m["n"], m["recall@1"], m["recall@5"], m["recall@10"]), (4, 0.25, 0.5, 0.75))
+        self.assertAlmostEqual(m["MRR"], (1 + 0.5 + 0 + 1 / 6) / 4, places=3)
 
 
 if __name__ == "__main__":

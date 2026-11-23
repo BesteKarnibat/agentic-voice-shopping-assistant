@@ -67,8 +67,12 @@ def run(q, top_k):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--lam", type=float, default=None, help="override HYBRID_LAMBDA for this run")
+    parser.add_argument("--chroma-dir", default=None, help="evaluate another index (for comparing embedding variants)")
     parser.add_argument("--queries", default="eval_queries.json", help="query file inside rag/eval (default: eval_queries.json)")
     args = parser.parse_args()
+    if args.chroma_dir:
+        import rag.search as search
+        search.CHROMA_PATH = args.chroma_dir
     if args.lam is not None:
         retrieval.HYBRID_LAMBDA = args.lam
     RAG_EVAL_DIR.mkdir(parents=True, exist_ok=True)
