@@ -23,6 +23,6 @@ agent, or tool that uses it. This is worth 5 points and is graded on completenes
 | `retriever_tools.md` | Tool-call instructions | `retriever` → `rag.search`, `web.search` | `rag_results`, `web_results`, `reconciled` | Devanshu | todo |
 | `answerer_system.md` | Answerer prompt | `answerer` | `draft_answer`, `final_answer`, `comparison_table`, `citations`, `spoken_summary` | Beste | todo |
 | `critic_system.md` | Critic prompt | `critic` | `critic` | Beste | todo |
-| `guardrails.md` | Guardrail instructions | `router` (input), `critic` (output) | `safety`, `critic.safety_issues` | Beste | todo |
+| `guardrails.md` | Guardrail instructions | `router` (input), `critic` (output) | `safety`, `critic.safety_issues` | Beste | draft |
 
 Add rows for any other prompt, for example a separate spoken-summary prompt or a ProofAgent judge prompt.
