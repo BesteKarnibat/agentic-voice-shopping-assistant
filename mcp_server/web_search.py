@@ -8,6 +8,9 @@ from __future__ import annotations
 
 import os
 import re
+import threading
+import time
+from collections import deque
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
@@ -42,12 +45,70 @@ def source_domain(url: str) -> str:
     return host.removeprefix("www.")
 
 
+def is_allowed(domain: str) -> bool:
+    """True if the domain is on the allow-list or is a subdomain of an allowed domain."""
+    return any(domain == d or domain.endswith("." + d) for d in cfg.ALLOWED_DOMAINS)
+
+
+class RateLimitError(RuntimeError):
+    pass
+
+
+class RateLimiter:
+    """Sliding window: at most `calls` acquisitions per `window_s` seconds."""
+
+    def __init__(self, calls: int, window_s: float, clock=time.monotonic):
+        self.calls, self.window_s, self.clock = calls, window_s, clock
+        self._times: deque[float] = deque()
+        self._lock = threading.Lock()
+
+    def acquire(self) -> None:
+        with self._lock:
+            now = self.clock()
+            while self._times and now - self._times[0] >= self.window_s:
+                self._times.popleft()
+            if len(self._times) >= self.calls:
+                wait = self.window_s - (now - self._times[0])
+                raise RateLimitError(f"web.search rate limit reached; retry in {wait:.0f}s")
+            self._times.append(now)
+
+
+class TTLCache:
+    def __init__(self, ttl_s: float, clock=time.monotonic):
+        self.ttl_s, self.clock = ttl_s, clock
+        self._data: dict[tuple, tuple[float, WebSearchOutput]] = {}
+        self._lock = threading.Lock()
+
+    def get(self, key: tuple) -> WebSearchOutput | None:
+        with self._lock:
+            entry = self._data.get(key)
+            if entry is None:
+                return None
+            stored_at, value = entry
+            if self.clock() - stored_at >= self.ttl_s:
+                del self._data[key]
+                return None
+            return value
+
+    def put(self, key: tuple, value: WebSearchOutput) -> None:
+        with self._lock:
+            self._data[key] = (self.clock(), value)
+
+
+_cache = TTLCache(cfg.CACHE_TTL_S)
+_limiter = RateLimiter(cfg.RATE_LIMIT_CALLS, cfg.RATE_LIMIT_WINDOW_S)
+
+
 def normalize(args: WebSearchInput, payload: dict) -> WebSearchOutput:
     results = []
-    for item in payload.get("organic", [])[: args.max_results]:
+    for item in payload.get("organic", []):
         url, title = item.get("link"), item.get("title")
         if not url or not title:
             continue  # a result without a URL cannot be cited
+        if not is_allowed(source_domain(url)):
+            continue  # domain restriction
+        if len(results) == args.max_results:
+            break
         snippet = item.get("snippet", "")
         results.append(
             WebResult(
@@ -69,15 +130,23 @@ def normalize(args: WebSearchInput, payload: dict) -> WebSearchOutput:
 
 
 def web_search(args: WebSearchInput) -> WebSearchOutput:
+    key = (" ".join(args.query.lower().split()), args.max_results)
+    hit = _cache.get(key)
+    if hit is not None:
+        return hit.model_copy(update={"cached": True})
+
     load_dotenv(ENV_FILE)
-    key = os.getenv("SERPER_API_KEY")
-    if not key:
+    api_key = os.getenv("SERPER_API_KEY")
+    if not api_key:
         raise RuntimeError("SERPER_API_KEY is not set (add it to .env)")
+    _limiter.acquire()
     resp = httpx.post(
         cfg.SERPER_URL,
-        headers={"X-API-KEY": key},
-        json={"q": args.query, "num": args.max_results, "gl": "us"},
+        headers={"X-API-KEY": api_key},
+        json={"q": args.query, "num": cfg.SERPER_NUM_RESULTS, "gl": "us"},
         timeout=cfg.SERPER_TIMEOUT_S,
     )
     resp.raise_for_status()
-    return normalize(args, resp.json())
+    out = normalize(args, resp.json())
+    _cache.put(key, out)
+    return out
