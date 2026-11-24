@@ -4,7 +4,7 @@ import os
 
 os.environ.setdefault("LLM_PROVIDER", "fake")
 os.environ["MOCK_RAG_FORCE_FAKE"] = "1"
-os.environ.setdefault("MCP_SERVER_ARGS", "-m mocks.mcp_server")
+os.environ["MCP_SERVER_ARGS"] = "-m mocks.mcp_server"  # tests assert on the fake catalog
 
 import pytest  # noqa: E402
 

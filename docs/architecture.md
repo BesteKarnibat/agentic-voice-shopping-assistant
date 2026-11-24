@@ -34,8 +34,8 @@ flowchart LR
 | Voice in / out, UI | Whisper ASR, TTS, Streamlit | Alekhya | `feature/ui` (planned) |
 | Orchestration | LangGraph: Router, Planner, Retriever, Reconcile | Devanshu | [agent/](../agent/) |
 | Answer quality | Answerer, Critic, guardrails | Beste | stub in [agent/nodes/answerer_stub.py](../agent/nodes/answerer_stub.py) |
-| Tools | MCP server: `rag.search`, `web.search` | Juan | mock in [mocks/mcp_server.py](../mocks/mcp_server.py) |
-| Private catalog | Preprocessing, Chroma index, `rag_search()` | Akshaj | `feature/rag` (planned) |
+| Tools | MCP server: `rag.search`, `web.search` | Juan | [mcp_server/](../mcp_server/) |
+| Private catalog | Preprocessing, Chroma index, `rag_search()` | Akshaj | [rag/](../rag/) |
 | Evaluation | ProofAgent scenarios and scorecard | Beste | `feature/eval` |
 
 Details of the graph: [components/langgraph.md](components/langgraph.md).

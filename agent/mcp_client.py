@@ -36,6 +36,7 @@ class MCPToolClient:
         self._stop = asyncio.Event()
         self._startup_error: BaseException | None = None
         self._lock = asyncio.Lock()
+        self._warm = False
 
     @property
     def alive(self) -> bool:
@@ -64,6 +65,7 @@ class MCPToolClient:
             if self.alive:
                 return
             self._ready, self._stop, self._startup_error = asyncio.Event(), asyncio.Event(), None
+            self._warm = False
             self._task = asyncio.create_task(self._hold(), name="mcp-session")
             try:
                 await asyncio.wait_for(self._ready.wait(), cfg.MCP_STARTUP_TIMEOUT_S)
@@ -79,11 +81,13 @@ class MCPToolClient:
             await self.start()
         if self.tool_names and name not in self.tool_names:
             raise ToolError(f"Tool '{name}' not advertised by the MCP server (has {self.tool_names})")
+        timeout = cfg.MCP_TOOL_TIMEOUT_S if self._warm else cfg.MCP_FIRST_CALL_TIMEOUT_S
         try:
             result = await self._session.call_tool(
-                name, arguments, read_timeout_seconds=timedelta(seconds=cfg.MCP_TOOL_TIMEOUT_S))
+                name, arguments, read_timeout_seconds=timedelta(seconds=timeout))
         except Exception as e:  # noqa: BLE001
             raise ToolError(f"{name} failed: {e}") from e
+        self._warm = True
         text = " ".join(getattr(c, "text", "") for c in result.content)
         if result.isError:
             raise ToolError(f"{name} returned an error: {text[:300]}")

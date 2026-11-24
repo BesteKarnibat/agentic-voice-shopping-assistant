@@ -1,4 +1,5 @@
-"""Mock MCP server (stdio) with rag.search and web.search. Owner: Devanshu. Temporary until Juan's lands.
+"""Mock MCP server (stdio) with rag.search and web.search. Owner: Devanshu. Used by the offline tests
+(MCP_SERVER_ARGS="-m mocks.mcp_server"); the real server is mcp_server/.
 
 Tools and schemas come from contracts.tool_schemas.TOOLS. rag.search uses the real rag_search()
 once the index exists (MOCK_RAG_FORCE_FAKE=1 forces the fake catalog); web.search is always fake.

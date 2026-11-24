@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 
 from pydantic import ValidationError
@@ -14,8 +15,9 @@ from contracts.tool_schemas import RagSearchInput, RagSearchOutput, WebSearchInp
 
 
 def _lookup_query(product: dict) -> str:
-    """'<brand> <title> price' without repeating the brand."""
-    brand, title = product.get("brand") or "", product["title"]
+    """'<brand> <short title> price'. Catalog titles are long marketing strings, so keep the head."""
+    brand = product.get("brand") or ""
+    title = " ".join(re.split(r" - | – |\(|,|\|", product["title"])[0].split()[:8])
     prefix = "" if not brand or title.lower().startswith(brand.lower()) else brand + " "
     return f"{prefix}{title} price"
 

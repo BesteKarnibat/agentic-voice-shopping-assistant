@@ -110,13 +110,13 @@ state = run_agent(transcript, session_id=None, asr_segments=None, on_step=None)
 - The MCP server subprocess is started once and reused across calls (the real one loads an embedding model).
 - CLI: `uv run python -m agent "..."`, `uv run doit agent_demo`, `uv run doit agent_ask -q "..."`.
 
-## 7. Swapping mocks for real components
+## 7. Real components and mocks
 
-| Component | Today | Swap |
-|-----------|-------|------|
-| `rag.search` backend | [mocks/fake_catalog.py](../../mocks/fake_catalog.py) (12 fake products) | Automatic: the mock server calls `rag.search.rag_search()` as soon as Akshaj's module is importable and `data/index/` exists. |
-| MCP server | [mocks/mcp_server.py](../../mocks/mcp_server.py) | One line: `MCP_SERVER_ARGS` default in [config/graph.py](../../config/graph.py) (or the env var) → Juan's module, e.g. `-m mcp_server.server`. Requirements: stdio transport, tool names `rag.search` / `web.search`, results returned as `structuredContent` or JSON text matching the contract output models. |
-| Answerer / Critic | [agent/nodes/answerer_stub.py](../../agent/nodes/answerer_stub.py) | One import line in [agent/graph.py](../../agent/graph.py). The interface they must match is at the top of the stub file. |
+| Component | Default | Mock / swap |
+|-----------|---------|-------------|
+| MCP server | Juan's [mcp_server/](../../mcp_server/) (`MCP_SERVER_ARGS="-m mcp_server"` in [config/graph.py](../../config/graph.py)), backed by Akshaj's `rag_search()` and Serper | `MCP_SERVER_ARGS="-m mocks.mcp_server"` runs [mocks/mcp_server.py](../../mocks/mcp_server.py) on 12 fake products ([mocks/fake_catalog.py](../../mocks/fake_catalog.py)); the offline tests always use it. |
+| First tool call | waits up to `MCP_FIRST_CALL_TIMEOUT_S` (120 s) while the server loads the embedding model and reranker | later calls: `MCP_TOOL_TIMEOUT_S` (30 s) |
+| Answerer / Critic | stub: [agent/nodes/answerer_stub.py](../../agent/nodes/answerer_stub.py) | One import line in [agent/graph.py](../../agent/graph.py). The interface they must match is at the top of the stub file. |
 
 ## 8. Decisions, limitations, and known issues
 

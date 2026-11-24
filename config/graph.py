@@ -14,10 +14,12 @@ def _env_int(name: str, default: int) -> int:
     return int(os.getenv(name, default))
 
 
-# MCP server (stdio). Point MCP_SERVER_ARGS at Juan's module when it lands.
+# MCP server (stdio): Juan's server. Offline/mock: MCP_SERVER_ARGS="-m mocks.mcp_server".
 MCP_SERVER_COMMAND: str = os.getenv("MCP_SERVER_COMMAND", sys.executable)
-MCP_SERVER_ARGS: str = os.getenv("MCP_SERVER_ARGS", "-m mocks.mcp_server")
+MCP_SERVER_ARGS: str = os.getenv("MCP_SERVER_ARGS", "-m mcp_server")
 MCP_TOOL_TIMEOUT_S: float = _env_float("MCP_TOOL_TIMEOUT_S", 30.0)
+# First call on a new connection waits for the server to load the embedding model and reranker.
+MCP_FIRST_CALL_TIMEOUT_S: float = _env_float("MCP_FIRST_CALL_TIMEOUT_S", 120.0)
 MCP_STARTUP_TIMEOUT_S: float = _env_float("MCP_STARTUP_TIMEOUT_S", 60.0)
 
 RAG_TOOL = "rag.search"
