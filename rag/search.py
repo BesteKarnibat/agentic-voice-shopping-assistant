@@ -293,6 +293,13 @@ def rag_search(inp: RagSearchInput) -> RagSearchOutput:
     else:
         ranked = kept[:inp.top_k]
 
+    # Nothing relevant exists: say so with an empty list (so a caller can fall back to the web) instead of returning
+    # the least-bad products. Only meaningful when `score` is the reranker's relevance probability.
+    floor = retrieval.NOT_FOUND_SCORE
+    if reranker and floor is not None and ranked and ranked[0][2] < floor:
+        applied["relevance"] = f"nothing relevant in the catalog: best match scored {ranked[0][2]:.3f}, below {floor}"
+        ranked = []
+
     products = [RagProduct(
         doc_id=doc_id,
         sku=meta.get("sku"),

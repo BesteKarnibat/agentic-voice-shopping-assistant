@@ -348,27 +348,52 @@ class EdgeCaseTests(unittest.TestCase):
 
 
 @need_index
-@unittest.skipUnless(retrieval.RERANKER_MODEL, "the found / not-found signal needs the reranker")
+@unittest.skipUnless(retrieval.RERANKER_MODEL, "the relevance score needs the reranker")
 class NotFoundSignalTests(unittest.TestCase):
-    """`score` is the reranker's relevance probability, so the best score says whether anything relevant exists.
-    The Answerer can use it: below 0.2 means nothing in the catalog matches the request."""
+    """`score` is the reranker's relevance probability. For SPECIFIC requests it separates real products from ones the
+    catalog does not carry, but it is only a hint: vague legitimate requests ("a gift for my niece") also score near 0,
+    so by default rag_search() never turns a low score into an empty result (NOT_FOUND_SCORE is None)."""
     NOT_IN_CATALOG = ["PlayStation 5 console", "iPhone 15 Pro case", "laptop charger USB-C", "diamond engagement ring",
                       "organic dog food", "kitchen knife set", "men's running shoes size 10", "car engine oil 5W-30",
                       "Samsung 55 inch TV", "protein powder chocolate", "wireless noise cancelling headphones", "winter jacket for men"]
     IN_CATALOG = ["wooden puzzle for a toddler", "remote control car", "stuffed animal", "building blocks", "board game for the family",
                   "baby rattle", "plush dinosaur", "card game", "doll with accessories", "birthday party decorations"]
+    VAGUE_BUT_LEGITIMATE = ["a gift for my five year old niece", "an activity for a rainy day", "a gift under twenty dollars for a kid",
+                            "something to calm an anxious child", "what do you recommend for a three year old"]
 
-    def test_out_of_catalog_requests_score_low(self):
+    def test_specific_out_of_catalog_requests_score_low(self):
         for q in self.NOT_IN_CATALOG:
             self.assertLess(search(query=q, top_k=1).results[0].score, 0.2, q)
 
-    def test_real_requests_score_high(self):
+    def test_specific_real_requests_score_high(self):
         for q in self.IN_CATALOG:
             self.assertGreater(search(query=q, top_k=1).results[0].score, 0.5, q)
 
     def test_scores_are_probabilities(self):
         for p in search(query="plush toy", top_k=10).results:
             self.assertTrue(0.0 <= p.score <= 1.0)
+
+    def test_the_cutoff_is_off_by_default(self):
+        self.assertIsNone(retrieval.NOT_FOUND_SCORE, "enabling it wrongly rejects about 1 in 4 vague requests")
+
+    def test_vague_but_legitimate_requests_still_return_products_by_default(self):
+        for q in self.VAGUE_BUT_LEGITIMATE:
+            out = search(query=q, top_k=5)
+            self.assertEqual(len(out.results), 5, q)
+            self.assertNotIn("relevance", out.filters_applied)
+
+    def test_the_optional_cutoff_returns_empty_with_a_reason(self):
+        before = retrieval.NOT_FOUND_SCORE
+        retrieval.NOT_FOUND_SCORE = 0.2
+        try:
+            gone = search(query="PlayStation 5 console", top_k=5)
+            kept = search(query="wooden puzzle for a toddler", top_k=5)
+        finally:
+            retrieval.NOT_FOUND_SCORE = before
+        self.assertEqual(gone.results, [])
+        self.assertIn("nothing relevant", gone.filters_applied["relevance"])
+        self.assertEqual(len(kept.results), 5)
+        self.assertNotIn("relevance", kept.filters_applied)
 
 
 @need_index

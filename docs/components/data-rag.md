@@ -63,11 +63,11 @@ Columns of `products.parquet`: `doc_id, sku, title, brand, brand_source, categor
 
 No match returns an empty list, never an exception; a blank query or `min_price` above `max_price` also returns empty with the reason. Every result keeps its `doc_id`, and its `features_snippet` is a prefix of the listing text.
 
-**Not-found signal:** the best `score` separates real requests from ones the catalog cannot serve. On 15 out-of-catalog queries (PS5, laptop charger, dog food, ...) the top score was at most 0.18 (median 0.001); on 38 real hand-written and short queries it was at least 0.99. **A best score below 0.2 means nothing relevant exists**; the Answerer should say so instead of recommending something. Only valid with the reranker on.
+**`score` is a hint, not a "not found" rule.** For specific requests it separates real products from ones the catalog does not carry: 15 specific off-catalog queries (PS5, laptop charger, dog food, ...) scored at most 0.18 and 38 specific real ones at least 0.99. It fails for vague requests: of 30 vague but legitimate voice requests ("a gift for my five year old niece", "an activity for a rainy day") 8 scored below 0.2, as low as off-catalog ones, and 3 of 20 further off-catalog requests (garden hose, wedding dress, bluetooth speaker) scored high. So `rag_search()` **never returns an empty list because of a low score**, and the Router, which can tell that a PlayStation is not a toy, should decide that a request is out of scope. `NOT_FOUND_SCORE` in [../../config/retrieval.py](../../config/retrieval.py) can switch on an empty-list rule at a chosen cut-off (default off; at 0.2 it wrongly rejects about 1 in 4 vague requests).
 
 ## 7. Retrieval evaluation
 Commands: `uv run doit rag_test rag_smoke_test rag_eval rag_sample_eval`.
-- **Tests (94):** parsers, data quality, index contents, search behaviour (including 300 random filter combinations checked against the parquet), the not-found signal, and compatibility with the shared contracts and `AgentState`.
+- **Tests (97):** parsers, data quality, index contents, search behaviour (including 300 random filter combinations checked against the parquet), the relevance-score hint for specific requests, and compatibility with the shared contracts and `AgentState`.
 - **Query sets:** [eval_queries.json](../../rag/eval/eval_queries.json) (34: 16 known-item, 8 constraint, 10 edge cases), [heldout_queries.json](../../rag/eval/heldout_queries.json) (12 known-item), and a 600-product random sample with generated queries ([random_sample_eval.py](../../rag/eval/random_sample_eval.py), seed 42). Hits are exact `doc_id` matches, so near-duplicate listings count as misses.
 
 | Measure | Before (MiniLM, hybrid 0.3, no reranker) | **Final** |
@@ -78,7 +78,7 @@ Commands: `uv run doit rag_test rag_smoke_test rag_eval rag_sample_eval`.
 | 600 products, features only: recall@10 | 0.68 | **0.79** |
 | 600 products, brand + subcategory: recall@10 | 0.52 | **0.78** |
 | 600 products, title-based queries: recall@1 | 0.96 / 0.98 | 0.97 / 0.98 |
-| Not-in-catalog detection | weak (cosine) | **0.2 cut-off: 15/15 flagged, 0 of 38 real queries flagged** |
+| Score as a relevance hint, specific requests | cosine, not separable | reranker probability: below 0.2 for 15 of 15 off-catalog, above 0.99 for 38 of 38 real (does not hold for vague requests, section 6) |
 
 What each component adds on the 600 products (feature-only recall@1): vector search alone 0.56, plus title match 0.55, plus reranker **0.69**. The title-match bonus now adds almost nothing for descriptive queries and only helps exact names (title without brand: 0.957 → 0.970); it is kept because it is cheap.
 
@@ -99,9 +99,10 @@ What each component adds on the 600 products (feature-only recall@1): vector sea
 - **No ratings** in the dataset: the agent cannot rank by stars. Could come from `web.search`.
 - **Safety data is thin:** warnings exist for 1.4% of products and age for 74%. The Answerer must never call a toy safe because nothing was found.
 - **Brand is best-effort** for about 75% of products (first title word) and can truncate unlisted multi-word brands.
-- **Generated queries share words with the listing.** The 600-product gains for feature queries are probably optimistic, because a reranker reads those shared words directly. The fair evidence is the 28 hand-written queries (recall@1 0.93, MRR 0.97, essentially unchanged from before) and the not-found signal, which does not depend on query wording. One missed hand-written query costs 3.6 points.
+- **Generated queries share words with the listing.** The 600-product gains for feature queries are probably optimistic, because a reranker reads those shared words directly. The fair evidence is the 28 hand-written queries (recall@1 0.93, MRR 0.97, essentially unchanged from before). One missed hand-written query costs 3.6 points.
 - **Numbers move slightly between index rebuilds** (up to 0.004 here): Chroma's approximate nearest-neighbour index is not bit-identical from build to build. The figures above are rounded to two decimals and hold.
-- **Cost of the reranker:** one more model (88 MB) and about 70 ms per search on CPU; `RERANKER_MODEL = None` removes both and the not-found signal with it.
+- **No reliable "not found" rule:** the reranker score cannot tell off-catalog requests from vague legitimate ones (section 6), so an off-catalog request still returns the closest toys and the Router has to catch it. Devanshu's Retriever only falls back to `web.search` on an *empty* result, so that fallback will not fire for them unless `NOT_FOUND_SCORE` is enabled.
+- **Cost of the reranker:** one more model (88 MB) and about 70 ms per search on CPU; `RERANKER_MODEL = None` removes both and the relevance score with it.
 - **Prices are kept as scraped:** 4 products under $1 (one at $0.01, likely a source glitch) and 30 over $500 (mostly swing sets; one $5,332 lab instrument filed under Toys & Games).
 - Package size and price per unit (#40) are not built: PR #78 removed those fields.
 

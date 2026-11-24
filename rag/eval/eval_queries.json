@@ -323,7 +323,7 @@
     "query": "PlayStation 5 console",
     "filters": {},
     "expect": "expect_low_score:0.2",
-    "note": "Product not in the catalog: the best result must score below 0.2. This works because `score` is the reranker's relevance probability; with the reranker off the score is a weak signal."
+    "note": "Specific off-catalog request: the best score must be below 0.2. The score is a hint, not a guarantee: vague legitimate requests can score near 0 too, so rag_search() does not turn it into an empty result by default."
   },
   {
     "id": "E5",
@@ -349,7 +349,7 @@
     "query": "laptop charger USB-C",
     "filters": {},
     "expect": "expect_low_score:0.2",
-    "note": "Out of catalog (electronics): nothing relevant, so the best score must be below 0.2."
+    "note": "Out of catalog (electronics): nothing relevant, so the best score must be below 0.2 (a specific request; see E4)."
   },
   {
     "id": "E8",
@@ -357,7 +357,7 @@
     "query": "organic dog food",
     "filters": {},
     "expect": "expect_low_score:0.2",
-    "note": "Out of catalog (pet food): nothing relevant, so the best score must be below 0.2."
+    "note": "Out of catalog (pet food): nothing relevant, so the best score must be below 0.2 (a specific request; see E4)."
   },
   {
     "id": "E9",
@@ -365,7 +365,7 @@
     "query": "men's running shoes size 10",
     "filters": {},
     "expect": "expect_low_score:0.2",
-    "note": "Out of catalog (shoes): nothing relevant, so the best score must be below 0.2."
+    "note": "Out of catalog (shoes): nothing relevant, so the best score must be below 0.2 (a specific request; see E4)."
   },
   {
     "id": "E10",

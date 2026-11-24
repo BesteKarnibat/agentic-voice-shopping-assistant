@@ -32,3 +32,11 @@ SNIPPET_CHARS = 220
 RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 RERANK_TOP_N = 20
 RERANK_MAX_LENGTH = 128  # tokens per passage: half the cost of 256 with the same quality in the trials
+
+# Optional "nothing relevant" rule: with the reranker on, a best score below this returns an EMPTY list (reason in
+# `filters_applied`) so a caller can fall back to the web. OFF by default (None), because the score cannot reliably tell
+# "off-catalog" from "vague but legitimate". Measured on 30 vague voice requests and 20 off-catalog ones, a 0.2 cut-off
+# wrongly rejected 8 of the 30 ("a gift for my five year old niece", "an activity for a rainy day") and still let 3 of
+# the 20 through (garden hose, wedding dress, bluetooth speaker): the reranker scores vague legitimate requests as low
+# as off-catalog ones. Let the Router decide "not a toy request"; use `score` only as a hint.
+NOT_FOUND_SCORE = None
