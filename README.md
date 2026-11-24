@@ -48,6 +48,34 @@ uv run doit <task>       # run one task
 uv run doit clean <task> # delete a task's outputs so it runs again
 ```
 
+Task names are the function names in `dodo.py` without the `task_` prefix (`task_download_kaggle_dataset` → `download_kaggle_dataset`).
+`uv run doit` with no arguments runs only the tasks listed in `DOIT_CONFIG["default_tasks"]`.
+
+### Add a new task
+
+1. Put the logic in a script under `scripts/` (or in your package) that can also run on its own.
+2. Add a `task_<name>()` function to [dodo.py](dodo.py) that returns a dict. Use the download task as the model:
+
+   ```python
+   from config.paths import PRODUCTS_PARQUET, KAGGLE_CSV, ROOT
+
+   def task_preprocess():
+       """Clean the raw CSV into products.parquet."""   # the docstring is what `doit list` shows
+       script = ROOT / "scripts" / "preprocess.py"
+       return {
+           "actions": [f'"{PYTHON}" "{script}"'],
+           "file_dep": [script, KAGGLE_CSV],  # inputs: re-run when any of them changes
+           "targets": [PRODUCTS_PARQUET],     # outputs: skipped while they exist and inputs are unchanged
+           "clean": True,                     # `doit clean preprocess` deletes the targets
+       }
+   ```
+
+3. Take every input and output path from [config/paths.py](config/paths.py). Don't write paths by hand.
+4. Run the interpreter as `PYTHON` (the uv venv) so the task uses the locked dependencies.
+5. Chain tasks with `file_dep`: a task that reads another task's target lists it in `file_dep`, and doit runs them in order.
+6. Add the task to `DOIT_CONFIG["default_tasks"]` only if a fresh clone needs it to run by default. Check with `uv run doit list`.
+7. Add any new secret to `.env.example` and the new path to the table in [Paths](#paths).
+
 ## Download the data
 
 The private catalog is the [Amazon Product Dataset 2020](https://www.kaggle.com/datasets/promptcloud/amazon-product-dataset-2020) on Kaggle. Each person downloads it with their own Kaggle account. No data is committed to git.
@@ -67,3 +95,18 @@ Kaggle ships them (one CSV, ~10k products) under `data/raw/kaggle/`.
 
 `data/` is gitignored. This step only downloads. Preprocessing into `products.parquet` is a separate step.
 To download again from scratch, run `uv run doit clean download_kaggle_dataset && uv run doit download_kaggle_dataset`.
+
+## Tools
+
+The tools the project uses, with the owner who added each one. Prefer tools that uv manages (`uv add <package>`).
+Each owner adds their own rows in the same PR that introduces the tool. Don't list a tool before it is decided.
+
+| Tool | Purpose | Owner | Managed by |
+|------|---------|-------|------------|
+| [uv](https://docs.astral.sh/uv/) | Python 3.12 and dependency management (`pyproject.toml`, `uv.lock`) | Everyone | `brew install uv` |
+| [pydoit](https://pydoit.org) | Build and run tasks in [dodo.py](dodo.py) | Juan (example), Devanshu (orchestration) | `uv add doit` |
+| [kagglehub](https://github.com/Kaggle/kagglehub) | Download the Amazon Product Dataset 2020 | Juan | `uv add kagglehub` |
+| [Serper](https://serper.dev) | Search API behind `web.search` (proposed, to confirm with test queries; see [decision](docs/decisions/web_search_api.md)) | Juan | API key in `.env` (`SERPER_API_KEY`) |
+
+Still to add by their owners: MCP server library and transport (Juan), vector store and embeddings (Akshaj),
+LangGraph and the LLM client (Devanshu), ASR, TTS and Streamlit (Alekhya), ProofAgent (Beste).
