@@ -100,6 +100,7 @@ What each component adds on the 600 products (feature-only recall@1): vector sea
 - **Safety data is thin:** warnings exist for 1.4% of products and age for 74%. The Answerer must never call a toy safe because nothing was found.
 - **Brand is best-effort** for about 75% of products (first title word) and can truncate unlisted multi-word brands.
 - **Generated queries share words with the listing.** The 600-product gains for feature queries are probably optimistic, because a reranker reads those shared words directly. The fair evidence is the 28 hand-written queries (recall@1 0.93, MRR 0.97, essentially unchanged from before) and the not-found signal, which does not depend on query wording. One missed hand-written query costs 3.6 points.
+- **Numbers move slightly between index rebuilds** (up to 0.004 here): Chroma's approximate nearest-neighbour index is not bit-identical from build to build. The figures above are rounded to two decimals and hold.
 - **Cost of the reranker:** one more model (88 MB) and about 70 ms per search on CPU; `RERANKER_MODEL = None` removes both and the not-found signal with it.
 - **Prices are kept as scraped:** 4 products under $1 (one at $0.01, likely a source glitch) and 30 over $500 (mostly swing sets; one $5,332 lab instrument filed under Toys & Games).
 - Package size and price per unit (#40) are not built: PR #78 removed those fields.
