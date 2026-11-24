@@ -10,7 +10,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
-import threading
 import time
 
 import mcp.types as types
@@ -65,8 +64,9 @@ async def call_tool(name: str, arguments: dict) -> dict:
 
 
 async def main() -> None:
-    # In a thread so the server answers the MCP handshake and discovery right away.
-    threading.Thread(target=warm_up_rag, name="rag-warmup", daemon=True).start()
+    # Load the models before serving. On Windows, loading them in a thread while stdio_server
+    # blocks reading stdin hangs the whole process. The handshake waits ~12 s instead.
+    warm_up_rag()
     async with stdio_server() as (read, write):
         await server.run(read, write, server.create_initialization_options())
 
