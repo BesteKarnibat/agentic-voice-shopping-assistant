@@ -1,7 +1,7 @@
 """Large automatic retrieval evaluation over a random sample of products.
 
     uv run doit rag_sample_eval
-    uv run python -m rag.eval.random_sample_eval [--n 600] [--seed 42] [--lams 0,0.3] [--chroma-dir DIR]
+    uv run python -m rag.eval.random_sample_eval [--n 600] [--seed 42] [--chroma-dir DIR]
 
 Idea taken from the earlier Amazon_Multimodel_RAG project: pick random products, generate queries from their own
 fields, and check that the product comes back. No hand labels, so it scales to hundreds of products.
@@ -11,8 +11,12 @@ Query types, and how to read them:
   title_no_brand   title minus the brand, 8 words           so it favours the title-match bonus (hybrid)
   features         first 8 content words of the first       UNBIASED: no title words by construction; the fair
                    feature bullet                           test of semantic retrieval
-  brand_subcat     "<brand> <subcategory>"                  AMBIGUOUS on purpose: many products fit, so recall is
-                                                            low by design; for comparing settings only
+  brand_subcat     "<brand> <subcategory>"                  AMBIGUOUS on purpose: many products fit, so exact recall
+                                                            is low by design. Scored as precision@5: the share of
+                                                            the top 5 with that brand AND subcategory.
+
+Three systems are compared so each component's contribution is visible: vector search alone, plus the title/brand
+match bonus, plus the cross-encoder reranker (only if config/retrieval.py enables it).
 
 Hits are exact `doc_id` matches, so near-duplicate listings count as misses. `se_r1` is the standard error of recall@1.
 Output: random_sample_eval.json and random_sample_eval.md in RAG_EVAL_DIR (config/paths.py, gitignored).
@@ -69,35 +73,57 @@ def metrics(ranks: list) -> dict:
     }
 
 
-def run(n: int, seed: int, lams: list[float]) -> dict:
-    pool = eligible(pd.read_parquet(PRODUCTS_PARQUET))
+def systems() -> list[tuple[str, float, bool]]:
+    """(label, hybrid weight, reranker on) for the three systems compared."""
+    out = [("vector only", 0.0, False), ("+ title match", retrieval.HYBRID_LAMBDA, False)]
+    if retrieval.RERANKER_MODEL:
+        out.append(("+ reranker (shipped)", retrieval.HYBRID_LAMBDA, True))
+    return out
+
+
+def precision_at_5(top5_keys: list, key) -> float:
+    return sum(k == key for k in top5_keys) / len(top5_keys) if top5_keys else 0.0
+
+
+def run(n: int, seed: int) -> dict:
+    df = pd.read_parquet(PRODUCTS_PARQUET)
+    group_of = {r.doc_id: (r.brand, r.subcategory) for r in df.itertuples()}
+    pool = eligible(df)
     sample = pool.iloc[np.random.default_rng(seed).choice(len(pool), size=min(n, len(pool)), replace=False)]
-    ranks = {lam: {t: [] for t in QUERY_TYPES} for lam in lams}
-    for _, row in sample.iterrows():
-        for kind, text in make_queries(row).items():
-            for lam in lams:
-                retrieval.HYBRID_LAMBDA = lam  # read at call time by rag.search
-                ids = [p.doc_id for p in search.rag_search(RagSearchInput(query=text, top_k=10)).results]
-                ranks[lam][kind].append(ids.index(row["doc_id"]) + 1 if row["doc_id"] in ids else None)
-    return {
-        "sample_size": len(sample),
-        "seed": seed,
-        "results": {str(lam): {t: metrics(r) for t, r in by_type.items() if r} for lam, by_type in ranks.items()},
-    }
+    state = search._load()
+    shipped_reranker = state["reranker"]
+    results = {}
+    for label, lam, rerank in systems():
+        retrieval.HYBRID_LAMBDA = lam  # read at call time by rag.search
+        state["reranker"] = shipped_reranker if rerank else None
+        ranks = {t: [] for t in QUERY_TYPES}
+        p5 = []
+        for _, row in sample.iterrows():
+            for kind, text in make_queries(row).items():
+                found = search.rag_search(RagSearchInput(query=text, top_k=10)).results
+                ids = [p.doc_id for p in found]
+                ranks[kind].append(ids.index(row["doc_id"]) + 1 if row["doc_id"] in ids else None)
+                if kind == "brand_subcat":
+                    p5.append(precision_at_5([group_of[i] for i in ids[:5]], (row["brand"], row["subcategory"])))
+        results[label] = {t: metrics(r) for t, r in ranks.items() if r}
+        results[label]["brand_subcat"]["P@5"] = round(float(np.mean(p5)), 3)
+    state["reranker"] = shipped_reranker
+    retrieval.HYBRID_LAMBDA = dict((l, w) for l, w, _ in systems())["+ title match"]
+    return {"sample_size": len(sample), "seed": seed, "results": results}
 
 
 def write_report(out: dict) -> str:
     lines = [f"# Random-sample retrieval evaluation ({out['sample_size']} products, seed {out['seed']})", "",
-             "| Query type | lambda | n | R@1 (se) | R@5 | R@10 | MRR |", "|---|---|---|---|---|---|---|"]
-    for lam, by_type in out["results"].items():
-        for kind in QUERY_TYPES:
+             "| Query type | System | n | R@1 (se) | R@10 | MRR | P@5 |", "|---|---|---|---|---|---|---|"]
+    for kind in QUERY_TYPES:
+        for label, by_type in out["results"].items():
             if kind in by_type:
                 m = by_type[kind]
-                label = kind + (" *" if kind in BIASED else "")
-                lines.append(f"| {label} | {lam} | {m['n']} | {m['recall@1']} ({m['se_r1']}) | {m['recall@5']} | "
-                             f"{m['recall@10']} | {m['MRR']} |")
+                name = kind + (" *" if kind in BIASED else "")
+                lines.append(f"| {name} | {label} | {m['n']} | {m['recall@1']} ({m['se_r1']}) | {m['recall@10']} | "
+                             f"{m['MRR']} | {m.get('P@5', '')} |")
     lines += ["", "\\* biased toward the title-match bonus: the query shares words with the title by construction.",
-              "`features` is the unbiased test; `brand_subcat` is ambiguous on purpose (low recall is expected)."]
+              "`features` is the unbiased test; `brand_subcat` is ambiguous on purpose (judge it by P@5)."]
     return "\n".join(lines) + "\n"
 
 
@@ -105,13 +131,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--n", type=int, default=600, help="products to sample")
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--lams", default=None, help="comma-separated HYBRID_LAMBDA values (default: 0 and the config value)")
     parser.add_argument("--chroma-dir", default=None, help="evaluate another index (for comparing embedding variants)")
     args = parser.parse_args()
     if args.chroma_dir:
         search.CHROMA_PATH = args.chroma_dir
-    lams = [float(x) for x in args.lams.split(",")] if args.lams else sorted({0.0, retrieval.HYBRID_LAMBDA})
-    out = run(args.n, args.seed, lams)
+    out = run(args.n, args.seed)
     RAG_EVAL_DIR.mkdir(parents=True, exist_ok=True)
     (RAG_EVAL_DIR / "random_sample_eval.json").write_text(json.dumps(out, indent=2))
     report = write_report(out)

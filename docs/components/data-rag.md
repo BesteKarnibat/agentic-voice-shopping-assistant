@@ -1,7 +1,7 @@
 # Data preprocessing and indexing
 
 **Owner:** Akshaj · **Branch:** `feature/rag` · **Status:** draft
-**Code:** [../../rag/](../../rag/) (`preprocess.py`, `build_index.py`, `search.py`), settings in [../../config/retrieval.py](../../config/retrieval.py) · **Contract:** `RagSearchInput` / `RagProduct` in [../../contracts/tool_schemas.py](../../contracts/tool_schemas.py)
+**Code:** [../../rag/](../../rag/) (`preprocess.py`, `build_index.py`, `search.py`, `texts.py`), settings in [../../config/retrieval.py](../../config/retrieval.py) · **Contract:** `RagSearchInput` / `RagProduct` in [../../contracts/tool_schemas.py](../../contracts/tool_schemas.py)
 
 ## 1. Dataset
 Amazon Product Dataset 2020 (PromptCloud, Kaggle `promptcloud/amazon-product-dataset-2020`), the 10,002-row marketing sample. **Slice: Toys & Games, 6,662 products, 20 subcategories.**
@@ -38,70 +38,77 @@ Rows: 10,002 raw, 6,662 after the Toys & Games filter, no rows dropped after tha
 Columns of `products.parquet`: `doc_id, sku, title, brand, brand_source, category, subcategory, price, price_is_range, rating, features, ingredients, age_range, min_age_years, max_age_years, age_source, safety_warnings, product_url`. They map one to one onto `RagProduct` (`features` becomes `features_snippet`; `rating` and `ingredients` stay `None`, and `ingredients` is not in the contract).
 
 ## 5. Indexing
-`uv run doit index`: about 22 s on CPU, 44 MB.
-- **Text embedded:** `title. features. Recommended age: <age>`. No chunking: one vector per product.
-- **Model:** `sentence-transformers/all-MiniLM-L6-v2`, local, 384 dimensions. Chosen over a hosted embedding API so no key is needed and the MCP server can embed queries on any laptop. Index and queries must use the same model (`config/retrieval.py`).
-- **Store:** Chroma, persistent, cosine space, collection `products`. Chosen because it filters on metadata natively. FAISS would need a separate filter layer.
-- **Metadata:** `sku, title, brand, category, subcategory, price, min/max age, age_known, safety_warnings` (joined text, Chroma cannot hold lists). Unknown values are omitted.
+`uv run doit index`: about 65 s on a laptop, 97 MB on disk. One vector per product (no chunking).
+- **Model:** `BAAI/bge-base-en-v1.5`, local, 768 dimensions, with its standard query instruction prefix. No API key; the MCP server embeds queries on any laptop. First run downloads about 420 MB (plus 88 MB for the reranker). Index and queries must use the same model and text recipe: all set in [../../config/retrieval.py](../../config/retrieval.py), and `rag_search()` refuses to run against an index built with another model.
+- **Text embedded:** `title. Brand: <brand>. Category: <subcategory>. <first 3 feature bullets>. Recommended age: <age>` (recipe in [../../rag/texts.py](../../rag/texts.py)).
+- **Store:** Chroma, persistent, cosine space, collection `products`. Chosen because it filters on metadata natively; FAISS would need a separate filter layer.
+- **Metadata:** `sku, title, brand, category, subcategory, price, min/max age, age_known, safety_warnings, listing_text, snippet`. `listing_text` is what the listing itself says (no labels we added), used for exclusions and for the reranker. Chroma cannot hold lists or `None`, so warnings are joined text and unknowns are omitted.
 
 ## 6. Retrieval (`rag_search()`)
-`from rag.search import rag_search`; takes `RagSearchInput`, returns `RagSearchOutput` (plain, JSON-serializable). First call about 2 s (model load), then 20-50 ms.
+`from rag.search import rag_search`; takes `RagSearchInput`, returns `RagSearchOutput` (plain, JSON-serializable, unchanged contract). First call about 4 s (loads two models), then about 55 ms median and 120 ms p95 on an Apple-silicon laptop; the reranker step alone is about 70 ms on CPU only.
+
+1. **Candidates:** vector top-50 (with the filters below) plus 30 BM25 matches on title and brand.
+2. **Score:** `cosine + 0.05 * title_overlap` (share of the query's content words found in the title or brand).
+3. **Exclusions:** products whose listing text or warnings mention an `exclude_features` phrase are dropped (matching ignores plural and singular, so "batteries" also catches "battery").
+4. **Rerank:** a cross-encoder (`ms-marco-MiniLM-L-6-v2`) re-orders the best 20 and the top `top_k` are returned. `score` is then the reranker's relevance probability (0 to 1). Set `RERANKER_MODEL = None` to switch it off.
 
 | Filter | Behaviour |
 |---|---|
-| `category` | exact; a subcategory name such as "Puzzles" also works |
-| `brand` | tolerant of speech: "fisher price" matches "Fisher-Price", "and" matches "&" |
+| `category` | free text from the Router is mapped to a catalog subcategory ("board games", "lego", "costumes"); if nothing matches, the filter is **not applied** and `filters_applied` says so (the search is never emptied by wording) |
+| `brand` | tolerant of speech and spelling ("fisher price", "Melissa and Doug", "Fisher Price Little People"); an unknown brand returns an empty list with the reason |
 | `min_price`, `max_price` | products with no price never match |
 | `child_age_years` | drops products whose minimum age is above the child's; products with **no stated age are kept** |
-| `exclude_features` | text match on features and warnings, applied after retrieval |
-| `min_rating` | **not applied** (no data); reported in `filters_applied` as "not applied: catalog has no rating data" instead of silently dropping everything |
+| `exclude_features` | see step 3 |
+| `min_rating` | **not applied** (no data); reported as "not applied: catalog has no rating data" |
 
-**Scoring:** `cosine(query, product) + 0.3 * title_overlap` (share of the query's content words found in the title or brand). Candidates are the vector top-50 plus a BM25 top-30 on title and brand. No match returns an empty list, never an exception; a blank query or `min_price` above `max_price` also returns empty, with the reason in `filters_applied`. `score` is for ordering only and can slightly exceed 1.0. Every result keeps its `doc_id` for citations.
+No match returns an empty list, never an exception; a blank query or `min_price` above `max_price` also returns empty with the reason. Every result keeps its `doc_id`, and its `features_snippet` is a prefix of the listing text.
+
+**Not-found signal:** the best `score` separates real requests from ones the catalog cannot serve. On 15 out-of-catalog queries (PS5, laptop charger, dog food, ...) the top score was at most 0.18 (median 0.001); on 38 real hand-written and short queries it was at least 0.99. **A best score below 0.2 means nothing relevant exists**; the Answerer should say so instead of recommending something. Only valid with the reranker on.
 
 ## 7. Retrieval evaluation
-`uv run doit rag_smoke_test rag_eval`: 30 queries in [../../rag/eval/eval_queries.json](../../rag/eval/eval_queries.json): 16 known-item (one expected `doc_id` each), 8 constraint (every result must obey every filter, checked against the parquet), 6 edge cases (unknown brand, impossible budget, unsupported rating filter, product not in the catalog, ambiguous request, strict age filter). Report goes to `data/eval/EVAL_REPORT.md`.
+Commands: `uv run doit rag_test rag_smoke_test rag_eval rag_sample_eval`.
+- **Tests (94):** parsers, data quality, index contents, search behaviour (including 300 random filter combinations checked against the parquet), the not-found signal, and compatibility with the shared contracts and `AgentState`.
+- **Query sets:** [eval_queries.json](../../rag/eval/eval_queries.json) (34: 16 known-item, 8 constraint, 10 edge cases), [heldout_queries.json](../../rag/eval/heldout_queries.json) (12 known-item), and a 600-product random sample with generated queries ([random_sample_eval.py](../../rag/eval/random_sample_eval.py), seed 42). Hits are exact `doc_id` matches, so near-duplicate listings count as misses.
 
-| Metric | v0 vector only | v1 hybrid (shipped) |
+| Measure | Before (MiniLM, hybrid 0.3, no reranker) | **Final** |
 |---|---|---|
-| Recall@1 | 0.75 | 0.88 |
-| Recall@5 / @10 | 0.94 / 0.94 | 1.00 / 1.00 |
-| MRR | 0.83 | 0.93 |
-| Constraint satisfaction | 1.00 | 1.00 |
-| Checks passed | 29/30 | 30/30 |
-| Latency p50 / p95 | ~20 / ~33 ms | ~25 / ~45 ms |
+| 34-query set: recall@1 / MRR | 0.88 / 0.93 | **0.88 / 0.94**; 34/34 checks, filters never violated |
+| 12 held-out queries: recall@1 | 1.00 | **1.00** |
+| 600 products, features only: recall@1 / MRR | 0.47 / 0.54 | **0.69 / 0.73** |
+| 600 products, features only: recall@10 | 0.68 | **0.79** |
+| 600 products, brand + subcategory: recall@10 | 0.52 | **0.78** |
+| 600 products, title-based queries: recall@1 | 0.96 / 0.98 | 0.97 / 0.98 |
+| Not-in-catalog detection | weak (cosine) | **0.2 cut-off: 15/15 flagged, 0 of 38 real queries flagged** |
 
-**Held-out check:** 12 further known-item queries ([../../rag/eval/heldout_queries.json](../../rag/eval/heldout_queries.json)), written before running and not used for tuning: recall@1 0.92 → 1.00 and MRR 0.94 → 1.00 (vector only vs hybrid). They name brands or characters, so they are easier than the failure case below and do not test it.
-
-**Random-sample check** (`uv run doit rag_sample_eval`: 600 random products, queries generated from each product's own fields, seed 42; [../../rag/eval/random_sample_eval.py](../../rag/eval/random_sample_eval.py)):
-
-| Query type | Recall@1 vector → hybrid | MRR vector → hybrid |
-|---|---|---|
-| Short title (biased \*) | 0.92 → 0.96 | 0.95 → 0.98 |
-| Title without brand (biased \*) | 0.92 → 0.98 | 0.94 → 0.98 |
-| **Features only (unbiased)** | **0.46 → 0.47** | 0.53 → 0.54 |
-| Brand + subcategory (ambiguous) | 0.11 → 0.16 | 0.19 → 0.25 |
-
-\* these queries share words with the title by construction, which favours the title-match bonus. On the unbiased test the hybrid gives **no gain**: it helps when the user's words appear in the title, not when they only describe features (feature-only recall@10 is 0.68).
-
-**Failure found (v0):** "300 piece jigsaw puzzle with a pet park scene for kids" did not return the Ravensburger Pet Park puzzle in the top 10, because other 300-piece puzzles outranked it (long marketing text dilutes the title in the embedding). The title/brand signal moved it to rank 3.
+What each component adds on the 600 products (feature-only recall@1): vector search alone 0.56, plus title match 0.55, plus reranker **0.69**. The title-match bonus now adds almost nothing for descriptive queries and only helps exact names (title without brand: 0.957 → 0.970); it is kept because it is cheap.
 
 ## 8. Decisions, limitations, and known issues
-- **Weight 0.3:** swept 0 to 0.6. 0.4 and above give slightly better MRR (0.97) but blur the "not in catalog" signal: "PlayStation 5 console" then scores 0.46, close to real matches. 0.3 is the highest weight that keeps it below 0.45.
-- **A similarity score alone cannot say "not found":** short real queries also top out near 0.5. The Answerer should check that a result actually names the requested product.
-- **No ratings:** the agent cannot rank by stars or cite a rating from private data. Could come from `web.search`.
-- **Warnings exist for 1.4% of products, age for 74%.** The Answerer must never call a toy safe because nothing was found.
-- **Brand is best-effort** for ~75% of products (first title word) and can truncate unlisted multi-word brands.
-- **Tested and not adopted: brand and category in the embedded text.** Brand+subcategory recall@10 rose 0.52 → 0.63, but the held-out set got worse (recall@1 1.00 → 0.92) and feature-only recall@10 fell 0.68 → 0.66.
-- **Tested and not adopted: one vector per feature bullet.** It means 5.5× the vectors (36,938 vs 6,662) and a rewrite of the filters. On 28 hand-written paraphrase queries it ties the shipped index (recall@1 0.93 at the shipped weight). Its large gain on generated feature queries (0.52 → 0.78) is not trustworthy, because the query is a bullet's own words. Revisit if feature-only recall becomes a problem in the demo.
-- **Small evaluation:** the weight was tuned on the 30 queries above (the 12 held-out ones were not), and one missed known-item query costs 6 points. Treat the numbers as indicative.
-- **Prices are kept as scraped.** 4 products are under $1 (one at $0.01, likely a source glitch) and 30 over $500 (mostly swing sets; one $5,332 lab instrument filed under Toys & Games). None were edited or dropped; a budget filter handles them naturally.
+**How the configuration was chosen.** Trials ran on a *tune* sample (500 random products, queries generated from their fields); the winners were confirmed on a *separate* 600-product sample and 28 hand-written paraphrase queries that were never used to choose. The rules were fixed before the confirm sample and the hand-written queries were looked at (the model rule after seeing the first model comparison on tune): adopt a change only if it gains at least 0.02 on tune and 0.01 on the confirm sample, hand-written MRR does not drop by more than 0.01, and search stays under 250 ms. Selection metric: mean of feature-only MRR and brand+subcategory precision@5.
+
+| Tried | Result | Decision |
+|---|---|---|
+| 7 embedding models | bge-base 0.515, bge-small 0.500, MiniLM 0.489, multi-qa 0.478, mpnet 0.467, gte-small 0.466, e5-small 0.463 | **bge-base** |
+| Embedded text | brand and category in the text: brand queries +0.10 precision but feature MRR -0.03; first 3 bullets beat all bullets; title only is clearly worse | **brand + category + first 3 bullets** |
+| Title-match weight | 0.3 suited MiniLM; for bge-base feature MRR falls steadily as the weight rises (0.66 at 0, 0.60 at 0.3) | **0.05** |
+| Reciprocal-rank fusion instead of a weighted sum | worse at every weight | additive |
+| Cross-encoder reranker | feature MRR 0.65 → 0.74 on tune; 20 candidates at 128 tokens cost 70 ms on CPU, 256 tokens cost more than double with the same quality | **adopted** |
+| What the reranker reads | without brand and category it hurt brand queries (precision 0.56 → 0.48); with them 0.61 | brand + category + all features |
+| One vector per feature bullet | 5.5x the vectors and a rewrite of filters; ties on the fair test | not adopted |
+
+**Limitations**
+- **No ratings** in the dataset: the agent cannot rank by stars. Could come from `web.search`.
+- **Safety data is thin:** warnings exist for 1.4% of products and age for 74%. The Answerer must never call a toy safe because nothing was found.
+- **Brand is best-effort** for about 75% of products (first title word) and can truncate unlisted multi-word brands.
+- **Generated queries share words with the listing.** The 600-product gains for feature queries are probably optimistic, because a reranker reads those shared words directly. The fair evidence is the 28 hand-written queries (recall@1 0.93, MRR 0.97, essentially unchanged from before) and the not-found signal, which does not depend on query wording. One missed hand-written query costs 3.6 points.
+- **Cost of the reranker:** one more model (88 MB) and about 70 ms per search on CPU; `RERANKER_MODEL = None` removes both and the not-found signal with it.
+- **Prices are kept as scraped:** 4 products under $1 (one at $0.01, likely a source glitch) and 30 over $500 (mostly swing sets; one $5,332 lab instrument filed under Toys & Games).
 - Package size and price per unit (#40) are not built: PR #78 removed those fields.
 
 ## 9. Rebuild from scratch
 ```bash
-uv run doit download_kaggle_dataset   # raw CSV
+uv run doit download_kaggle_dataset   # raw CSV (needs KAGGLE_API_TOKEN)
 uv run doit preprocess                # products.parquet
 uv run doit index                     # Chroma index
-uv run doit rag_unit_test rag_smoke_test rag_eval rag_sample_eval   # 31 unit tests, filter checks, retrieval scores
+uv run doit rag_test rag_smoke_test rag_eval rag_sample_eval   # tests, checks, retrieval scores
 ```
-Needs `chromadb`, `sentence-transformers`, `pandas` and `pyarrow` in the project dependencies.
+Changing the model, prefix or text recipe in `config/retrieval.py` needs `uv run doit clean index index`.

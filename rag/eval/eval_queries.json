@@ -322,8 +322,8 @@
     "type": "edge",
     "query": "PlayStation 5 console",
     "filters": {},
-    "expect": "expect_low_score:0.45",
-    "note": "Product not in the catalog: the best match must score clearly low (<0.45). Caveat: short in-catalog queries can also score ~0.5, so score alone is a weak 'not found' signal."
+    "expect": "expect_low_score:0.2",
+    "note": "Product not in the catalog: the best result must score below 0.2. This works because `score` is the reranker's relevance probability; with the reranker off the score is a weak signal."
   },
   {
     "id": "E5",
@@ -342,5 +342,37 @@
     },
     "expect": "expect_age_ok",
     "note": "Age filter must not return products whose stated minimum age exceeds 4."
+  },
+  {
+    "id": "E7",
+    "type": "edge",
+    "query": "laptop charger USB-C",
+    "filters": {},
+    "expect": "expect_low_score:0.2",
+    "note": "Out of catalog (electronics): nothing relevant, so the best score must be below 0.2."
+  },
+  {
+    "id": "E8",
+    "type": "edge",
+    "query": "organic dog food",
+    "filters": {},
+    "expect": "expect_low_score:0.2",
+    "note": "Out of catalog (pet food): nothing relevant, so the best score must be below 0.2."
+  },
+  {
+    "id": "E9",
+    "type": "edge",
+    "query": "men's running shoes size 10",
+    "filters": {},
+    "expect": "expect_low_score:0.2",
+    "note": "Out of catalog (shoes): nothing relevant, so the best score must be below 0.2."
+  },
+  {
+    "id": "E10",
+    "type": "edge",
+    "query": "wooden puzzle for a toddler",
+    "filters": {},
+    "expect": "expect_high_score:0.5",
+    "note": "Positive control: a real catalog request must score above 0.5, so the 0.2 cut-off does not reject real queries."
   }
 ]

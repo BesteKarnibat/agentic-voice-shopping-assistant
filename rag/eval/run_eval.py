@@ -107,6 +107,8 @@ def main():
                 passed = "not applied" in str(out.filters_applied.get("min_rating", ""))
             elif exp.startswith("expect_low_score:"):
                 passed = bool(out.results) and out.results[0].score < float(exp.split(":", 1)[1])
+            elif exp.startswith("expect_high_score:"):
+                passed = bool(out.results) and out.results[0].score > float(exp.split(":", 1)[1])
             elif exp == "expect_results_no_crash":
                 passed = len(ids) > 0
             elif exp == "expect_age_ok":

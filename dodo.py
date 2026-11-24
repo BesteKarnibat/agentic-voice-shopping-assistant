@@ -6,7 +6,7 @@
     uv run doit clean download_kaggle_dataset   # delete a task's outputs so it runs again
     uv run doit preprocess                      # raw CSV -> products.parquet (Toys & Games slice)
     uv run doit index                           # products.parquet -> Chroma vector index
-    uv run doit rag_unit_test rag_smoke_test rag_eval rag_sample_eval   # tests, checks, retrieval scores
+    uv run doit rag_test rag_smoke_test rag_eval rag_sample_eval   # tests, checks, retrieval scores
 
 doit skips a task when its targets exist and its file_dep have not changed.
 Add new steps (preprocess, index, app, ...) here as tasks instead of ad-hoc scripts.
@@ -66,9 +66,10 @@ def task_index():
     }
 
 
-def task_rag_unit_test():
-    """Unit tests for the preprocessing parsers (no index or data needed)."""
-    return {"actions": [f'"{PYTHON}" -m unittest rag.test_parsers']}
+def task_rag_test():
+    """Run every rag test: parsers, data quality, index, search and filters, contract compatibility.
+    Tests that need the index skip with a hint if `preprocess` and `index` have not run yet."""
+    return {"actions": [f'"{PYTHON}" -m unittest discover -s rag -t . -p "test_*.py"']}
 
 
 def task_rag_smoke_test():

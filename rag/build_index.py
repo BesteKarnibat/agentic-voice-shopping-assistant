@@ -12,21 +12,11 @@ import chromadb
 import pandas as pd
 from sentence_transformers import SentenceTransformer
 
+from config import retrieval
 from config.paths import CHROMA_DIR, PRODUCTS_PARQUET
-from config.retrieval import COLLECTION_NAME, EMBEDDING_MODEL
+from rag import texts
 
-MODEL = EMBEDDING_MODEL
-COLLECTION = COLLECTION_NAME
 BATCH = 256
-
-
-def doc_text(r):
-    parts = [r["title"]]
-    if r["features"] is not None and len(r["features"]):
-        parts.append(" ".join(r["features"]))
-    if isinstance(r["age_range"], str):
-        parts.append(f"Recommended age: {r['age_range']}")
-    return ". ".join(parts)
 
 
 def metadata(r):
@@ -47,29 +37,39 @@ def metadata(r):
     # Chroma metadata cannot hold lists: join warnings, rag_search splits them again
     if r["safety_warnings"] is not None and len(r["safety_warnings"]):
         m["safety_warnings"] = " | ".join(r["safety_warnings"])
+    # what the listing says, kept apart from the embedded text (which may carry brand/category labels we added)
+    m["listing_text"] = texts.listing_text(r)
+    snip = texts.snippet(r, retrieval.SNIPPET_CHARS)
+    if snip:
+        m["snippet"] = snip
     return m
 
 
 def main(parquet=PRODUCTS_PARQUET, chroma_dir=CHROMA_DIR):
     df = pd.read_parquet(parquet)
-    texts = [doc_text(r) for _, r in df.iterrows()]
-    metas = [metadata(r) for _, r in df.iterrows()]
+    rows = [r for _, r in df.iterrows()]
+    embedded = [texts.embed_text(r, retrieval.EMBED_TEXT) for r in rows]
+    metas = [metadata(r) for r in rows]
     t0 = time.time()
-    model = SentenceTransformer(MODEL)
-    emb = model.encode(texts, batch_size=64, normalize_embeddings=True, show_progress_bar=False)
+    model = SentenceTransformer(retrieval.EMBEDDING_MODEL)
+    emb = model.encode([retrieval.DOC_PREFIX + t for t in embedded], batch_size=64, normalize_embeddings=True,
+                       show_progress_bar=False)
     t_embed = time.time() - t0
 
     client = chromadb.PersistentClient(path=str(chroma_dir))
     try:
-        client.delete_collection(COLLECTION)  # rebuild from scratch
+        client.delete_collection(retrieval.COLLECTION_NAME)  # rebuild from scratch
     except Exception:
         pass
-    col = client.create_collection(COLLECTION, metadata={"hnsw:space": "cosine", "embedding_model": MODEL})
+    col = client.create_collection(retrieval.COLLECTION_NAME, metadata={
+        "hnsw:space": "cosine", "embedding_model": retrieval.EMBEDDING_MODEL, "embed_text": retrieval.EMBED_TEXT,
+        "query_prefix": retrieval.QUERY_PREFIX, "doc_prefix": retrieval.DOC_PREFIX})
+    ids = df["doc_id"].tolist()
     for i in range(0, len(df), BATCH):
         s = slice(i, i + BATCH)
-        col.add(ids=df["doc_id"].tolist()[s], embeddings=emb[s].tolist(),
-                documents=texts[s], metadatas=metas[s])
-    print(f"indexed {col.count()} docs | model {MODEL} | dim {emb.shape[1]} | embed {t_embed:.0f}s | total {time.time()-t0:.0f}s")
+        col.add(ids=ids[s], embeddings=emb[s].tolist(), documents=embedded[s], metadatas=metas[s])
+    print(f"indexed {col.count()} docs | model {retrieval.EMBEDDING_MODEL} | text {retrieval.EMBED_TEXT} | dim {emb.shape[1]} "
+          f"| embed {t_embed:.0f}s | total {time.time()-t0:.0f}s")
 
 
 if __name__ == "__main__":
