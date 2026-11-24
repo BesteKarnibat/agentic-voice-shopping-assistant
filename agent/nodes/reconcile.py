@@ -21,8 +21,18 @@ def _words(text: str | None) -> set[str]:
     return set(re.findall(r"[a-z0-9]+", (text or "").lower()))
 
 
+def short_title(title: str, max_words: int = 8) -> str:
+    """Head of a catalog title, before the marketing text ('Voila! Board Game - A Fast and Fun ...')."""
+    return " ".join(re.split(r" - | – |\(|,|\|", title)[0].split()[:max_words])
+
+
 def _distinctive(title: str, brand: str | None) -> set[str]:
-    return _words(title) - _GENERIC - _words(brand)
+    return _words(short_title(title)) - _GENERIC - _words(brand)
+
+
+def _is_marketplace(web: dict) -> bool:
+    domain = web.get("source_domain") or ""
+    return any(domain == d or domain.endswith("." + d) for d in cfg.MARKETPLACE_DOMAINS)
 
 
 def _match(product: dict, web: dict) -> tuple[str, float]:
@@ -47,20 +57,30 @@ _METHOD_RANK = {"sku": 3, "brand_title": 2, "similarity": 1, "none": 0}
 
 
 def reconcile_product(product: dict, web_results: list[dict], prefer_live: bool) -> ReconciledProduct:
-    best, method, score = None, "none", 0.0
+    # Rank: match method, score, then retailers over marketplaces (resale listings), then listings with a price.
+    best, method, score, best_key = None, "none", 0.0, None
     for w in web_results:
         m, s = _match(product, w)
-        if m != "none" and (_METHOD_RANK[m], s) > (_METHOD_RANK[method], score):
-            best, method, score = w, m, s
+        if m == "none":
+            continue
+        key = (_METHOD_RANK[m], s, not _is_marketplace(w), w.get("price") is not None)
+        if best_key is None or key > best_key:
+            best, method, score, best_key = w, m, s, key
 
     catalog_price = product.get("price")
     live_price = best.get("price") if best else None
     availability = best.get("availability") if best else None
     conflict = bool(catalog_price and live_price
                     and abs(live_price - catalog_price) / catalog_price > cfg.PRICE_CONFLICT_THRESHOLD)
+    lo, hi = cfg.PLAUSIBLE_PRICE_RATIO
+    implausible = bool(catalog_price and live_price and not lo <= live_price / catalog_price <= hi)
 
     notes = []
-    if live_price is not None and (prefer_live or catalog_price is None):
+    if implausible:
+        chosen, source = catalog_price, "catalog"
+        notes.append(f"Live price ${live_price:.2f} from {best['source_domain']} looks like a different listing "
+                     f"(used, bundle or accessory); kept the catalog price.")
+    elif live_price is not None and (prefer_live or catalog_price is None):
         chosen, source = live_price, "web"
         why = "user asked for current info" if prefer_live else "catalog has no price"
         notes.append(f"Using live price ${live_price:.2f} from {best['source_domain']} ({why}).")
@@ -68,6 +88,8 @@ def reconcile_product(product: dict, web_results: list[dict], prefer_live: bool)
         chosen, source = catalog_price, "catalog"
         if live_price is not None:
             notes.append("Using catalog price (user did not ask for current info).")
+        elif best is not None and prefer_live:
+            notes.append(f"Live listing found on {best['source_domain']} but it shows no price; using catalog price.")
     else:
         chosen, source = None, "unknown"
         notes.append("No price in catalog or live results.")

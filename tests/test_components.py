@@ -74,6 +74,29 @@ def test_out_of_stock_and_conflict_noted():
     assert "out of stock" in r["note"]
 
 
+VOILA = {"doc_id": "x1", "sku": "B01B2O2NS4", "brand": "Brain", "price": 15.59,
+         "title": "Brain Games Voila! Board Game - A Fast and Fun Family Board Game - Play with Kids, Teenagers "
+                  "and Adults - Award Winning Games for Children, Families & Casual Gamers"}
+EBAY_VOILA = {"title": "Voilà! Board Game VOILA 2015 Brain Games - New / Sealed", "url": "https://www.ebay.com/itm/1",
+              "snippet": "Brain Games Voila $2.99 Buy It Now", "source_domain": "ebay.com", "price": 2.99,
+              "availability": "unknown"}
+WALMART_VOILA = {"title": "Voila - Family Board Game", "url": "https://www.walmart.com/ip/Voila-Family-Board-Game/1",
+                 "snippet": "Brain Games Voila! ... current price $9.84", "source_domain": "walmart.com",
+                 "price": 9.84, "availability": "unknown"}
+
+
+def test_long_marketing_title_still_matches_and_retailer_beats_marketplace():
+    r = reconcile_product(VOILA, [EBAY_VOILA, WALMART_VOILA], prefer_live=True)
+    assert r["match_method"] == "brand_title" and "walmart.com" in r["live_url"]
+    assert r["chosen_price"] == 9.84 and r["price_conflict"]
+
+
+def test_implausible_live_price_is_not_used():
+    r = reconcile_product(VOILA, [EBAY_VOILA], prefer_live=True)
+    assert r["live_price"] == 2.99 and r["chosen_price"] == 15.59 and r["price_source"] == "catalog"
+    assert "different listing" in r["note"]
+
+
 def test_catalog_price_kept_when_user_did_not_ask_for_current_info():
     r = reconcile_product(PRODUCTS["amz-fake-006"], FAKE_WEB_RESULTS, prefer_live=False)
     assert r["price_conflict"] and r["chosen_price"] == 19.99 and r["price_source"] == "catalog"

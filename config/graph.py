@@ -40,6 +40,10 @@ CURRENT_INFO_KEYWORDS: tuple[str, ...] = (
 PRICE_CONFLICT_THRESHOLD: float = _env_float("PRICE_CONFLICT_THRESHOLD", 0.10)
 TITLE_MATCH_THRESHOLD: float = _env_float("TITLE_MATCH_THRESHOLD", 0.6)
 BRAND_TITLE_THRESHOLD: float = _env_float("BRAND_TITLE_THRESHOLD", 0.4)
+# A live price outside this ratio of the catalog price is probably another listing; keep the catalog price.
+PLAUSIBLE_PRICE_RATIO: tuple[float, float] = (0.4, 2.5)
+# Resale marketplaces lose ties against retailers.
+MARKETPLACE_DOMAINS: tuple[str, ...] = ("ebay.com",)
 
 # Answer
 TOP_N_ANSWER: int = 3

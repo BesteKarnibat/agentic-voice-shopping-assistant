@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-import re
 import time
 
 from pydantic import ValidationError
 
 from agent.mcp_client import ToolError, get_mcp_client
+from agent.nodes.reconcile import short_title
 from config import graph as cfg
 from contracts.state import AgentState, log_step
 from contracts.tool_schemas import RagSearchInput, RagSearchOutput, WebSearchInput, WebSearchOutput
@@ -17,7 +17,7 @@ from contracts.tool_schemas import RagSearchInput, RagSearchOutput, WebSearchInp
 def _lookup_query(product: dict) -> str:
     """'<brand> <short title> price'. Catalog titles are long marketing strings, so keep the head."""
     brand = product.get("brand") or ""
-    title = " ".join(re.split(r" - | – |\(|,|\|", product["title"])[0].split()[:8])
+    title = short_title(product["title"])
     prefix = "" if not brand or title.lower().startswith(brand.lower()) else brand + " "
     return f"{prefix}{title} price"
 
