@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
+import threading
 import time
 
 import mcp.types as types
@@ -18,10 +19,12 @@ from mcp.server.stdio import stdio_server
 
 from contracts.tool_schemas import TOOLS
 from mcp_server.call_log import log_call
-from mcp_server.tools import HANDLERS
+from mcp_server.tools import HANDLERS, warm_up_rag
 
-logging.basicConfig(stream=sys.stderr, level=logging.INFO, format="[mcp-server] %(message)s")
+# Third-party libraries (httpx, huggingface_hub, mcp) log every request at INFO: keep only warnings.
+logging.basicConfig(stream=sys.stderr, level=logging.WARNING, format="[mcp-server] %(message)s")
 log = logging.getLogger("mcp-server")
+log.setLevel(logging.INFO)
 
 server = Server("shopping-tools")
 
@@ -62,6 +65,8 @@ async def call_tool(name: str, arguments: dict) -> dict:
 
 
 async def main() -> None:
+    # In a thread so the server answers the MCP handshake and discovery right away.
+    threading.Thread(target=warm_up_rag, name="rag-warmup", daemon=True).start()
     async with stdio_server() as (read, write):
         await server.run(read, write, server.create_initialization_options())
 
