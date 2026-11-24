@@ -7,6 +7,7 @@ matching output model. Handlers are synchronous; the server runs them in a worke
 from __future__ import annotations
 
 from contracts.tool_schemas import RagSearchInput, RagSearchOutput, WebSearchInput, WebSearchOutput
+from mcp_server.web_search import web_search
 
 
 def rag_search_handler(args: RagSearchInput) -> RagSearchOutput:
@@ -17,7 +18,7 @@ def rag_search_handler(args: RagSearchInput) -> RagSearchOutput:
 
 
 def web_search_handler(args: WebSearchInput) -> WebSearchOutput:
-    raise NotImplementedError("web.search is not implemented yet (issue #14)")
+    return web_search(args)
 
 
 # Tool name (as in contracts.tool_schemas.TOOLS) -> handler.

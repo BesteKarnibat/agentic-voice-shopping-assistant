@@ -14,6 +14,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "doit" },
+    { name = "httpx" },
     { name = "kagglehub" },
     { name = "mcp" },
     { name = "polars" },
@@ -24,6 +25,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "doit", specifier = ">=0.37.0" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "kagglehub", specifier = ">=1.0.3" },
     { name = "mcp", specifier = ">=1.20,<2" },
     { name = "polars", specifier = ">=2.1.0" },
