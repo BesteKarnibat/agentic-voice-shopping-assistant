@@ -24,8 +24,8 @@ agent, or tool that uses it. This is worth 5 points and is graded on completenes
 | `planner_system.md` | Planner prompt | `planner` | `plan` | Devanshu | draft |
 | `retriever_tools.md` | Tool-use policy (no LLM: deterministic execution of the plan) | `retriever` → `rag.search`, `web.search`; `reconcile` | `rag_results`, `web_results`, `reconciled` | Devanshu | draft |
 | `refusal.md` | Fixed responses (no LLM), templates parsed from `guardrails.md` | `refuse`, `clarify` | `final_answer`, `spoken_summary` | Devanshu | draft |
-| `answerer_system.md` | Answerer prompt | `answerer` | `draft_answer`, `final_answer`, `comparison_table`, `citations`, `spoken_summary` | Beste | todo |
-| `critic_system.md` | Critic prompt | `critic` | `critic` | Beste | todo |
-| `guardrails.md` | Guardrail instructions | `router` (input), `critic` (output) | `safety`, `critic.safety_issues` | Beste | draft |
+| `answerer_system.md` | Answerer prompt (+ embeds `guardrails.md`); table and citations built in code | `answerer` | `draft_answer`, `final_answer`, `spoken_summary` (LLM); `comparison_table`, `citations` (code) | Beste | draft |
+| `critic_system.md` | Critic LLM review (+ embeds `guardrails.md`), on top of code checks | `critic` | `critic`, `revision_count` | Beste | draft |
+| `guardrails.md` | Guardrail instructions | `router` (input), `answerer`, `critic` (output) | `safety`, `critic.safety_issues` | Beste | draft |
 
 Add rows for any other prompt, for example a separate spoken-summary prompt or a ProofAgent judge prompt.

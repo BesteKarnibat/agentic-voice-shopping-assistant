@@ -9,8 +9,8 @@ from functools import lru_cache
 
 from langgraph.graph import END, START, StateGraph
 
-# Swap for Beste's real nodes here (#48).
-from agent.nodes.answerer_stub import answerer_node, critic_node
+from agent.nodes.answerer import answerer_node  # Beste (#46, #48)
+from agent.nodes.critic import critic_node  # Beste (#47, #48)
 from agent.nodes.planner import planner_node
 from agent.nodes.reconcile import reconcile_node
 from agent.nodes.respond import clarify_node, refuse_node
