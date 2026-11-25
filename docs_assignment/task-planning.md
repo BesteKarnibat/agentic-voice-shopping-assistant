@@ -7,7 +7,7 @@ Requirements are in [deliverables.md](deliverables.md). The original assignment 
 
 | # | Area | Owns | Key deliverables | Responsible |
 |---|------|------|------------------|-------------|
-| 1 | Data & RAG | Dataset → index → retrieval | Clean curated slice, parquet files, embeddings, FAISS/Chroma, hybrid search (vector + metadata filters), optional reranker, price-per-unit normalization | Akshaj |
+| 1 | Data & RAG | Dataset → index → retrieval | Clean curated slice, parquet files, embeddings, FAISS/Chroma, hybrid search (vector + metadata filters), optional reranker, age-range and safety-warning extraction | Akshaj |
 | 2 | MCP Server | Tool layer | Two-tool MCP server, tool discovery, JSON schemas, Brave/Serper wrapper, TTL cache, rate limiting, request/response logging, MCP README | Juan |
 | 3 | LangGraph Lead | Orchestration and integration | Graph wiring, Router, Planner, Retriever node (calls MCP), reconciliation of private vs. live results, step logging, owns the `main` branch and integration | Devanshu |
 | 4 | Voice & UI | Front and back of the experience | Whisper ASR (fragment-based), TTS (~15 s summary), Streamlit app with mic, transcript, step log, comparison table, citations, doc IDs, live links, audio playback | Alekhya |

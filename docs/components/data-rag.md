@@ -4,7 +4,7 @@
 **Code:** TODO (download script, cleaning, index build, `rag_search()`) · **Contract:** `RagSearchInput` / `RagProduct` in [../../contracts/tool_schemas.py](../../contracts/tool_schemas.py)
 
 ## 1. Dataset
-<!-- Source, slug, license, size, which slice and why. Which fields exist (rating, ingredients, reviews) and which are missing. -->
+<!-- Source, slug, license, size, which slice and why. Slice: Toys & Games. Which fields exist (rating, age range, safety warnings, reviews) and which are missing. -->
 TODO
 
 ## 2. Download
@@ -12,7 +12,7 @@ TODO
 TODO
 
 ## 3. Cleaning and curation
-<!-- Steps in order: filters, dedup, missing values, parsing ingredients/price/rating, how doc_id is built. Rows before → after. -->
+<!-- Steps in order: filters, dedup, missing values, parsing age range/safety warnings/price/rating, how doc_id is built. Rows before → after. -->
 
 | Step | What it does | Rows before → after |
 |------|--------------|---------------------|
@@ -27,7 +27,7 @@ TODO
 TODO
 
 ## 6. Retrieval (`rag_search()`)
-<!-- Top-k, filters (price, rating, ingredients), scoring, what is returned, how doc_id is preserved for citations. -->
+<!-- Top-k, filters (price, rating, child's age, excluded features), scoring, what is returned, how doc_id is preserved for citations. -->
 TODO
 
 ## 7. Retrieval evaluation

@@ -45,7 +45,7 @@ Decide as a team and record the answer here.
 - [ ] Web-search API: Brave or Serper (Juan).
 - [ ] MCP transport: stdio or HTTP/SSE (Juan, with Devanshu).
 - [ ] Vector store: FAISS or Chroma (Akshaj).
-- [ ] Data slice of the Amazon dataset: Akshaj picks the category while analyzing the data, then updates `contracts/tool_schemas.py` and `.json` (see section 1.1 of [deliverables.md](../docs_assignment/deliverables.md)).
+- [x] Data slice of the Amazon dataset: **Toys & Games**. Contracts updated with age and safety-warning fields (see section 1.1 of [deliverables.md](../docs_assignment/deliverables.md)).
 
 **Interfaces not yet in `contracts/`**
 

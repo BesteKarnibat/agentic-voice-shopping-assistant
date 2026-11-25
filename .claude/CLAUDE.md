@@ -81,7 +81,7 @@ python -c "from contracts.tool_schemas import export_json_schemas; export_json_s
 - **Planner:** prefer `rag.search` for product facts. Also use `web.search` only for "current / latest / in stock / current price" requests, or when catalog data is missing.
 - **web.search:** rate limited, TTL cache (60–300 s), always keeps the source URL, logs requests and responses.
 - **Spoken summary:** ≤ ~15 s (≈40 words), no citation markers. The full answer and table go on screen.
-- **Safety:** be careful with chemical advice (e.g. mixing cleaners), use domain restrictions on web results, never commit secrets.
+- **Safety:** respect age grades and repeat only the safety warnings a source states (choking hazards, magnets, button batteries), use domain restrictions on web results, never commit secrets.
 - **Prompt disclosure:** every important prompt must live in `prompts/` (or be documented), mapped to its node.
   Don't bury prompts inline in code without also disclosing them there.
 

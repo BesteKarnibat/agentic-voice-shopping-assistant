@@ -4,7 +4,7 @@
     "inputSchema": {
       "properties": {
         "query": {
-          "description": "Natural-language search text, e.g. 'eco-friendly stainless steel cleaner'.",
+          "description": "Natural-language search text, e.g. 'cooperative board game for young kids'.",
           "minLength": 1,
           "title": "Query",
           "type": "string"
@@ -27,7 +27,7 @@
             }
           ],
           "default": null,
-          "description": "Exact category filter, e.g. 'Household Cleaning'.",
+          "description": "Exact category filter, e.g. 'Toys & Games'.",
           "title": "Category"
         },
         "brand": {
@@ -86,12 +86,26 @@
           "description": "Minimum star rating.",
           "title": "Min Rating"
         },
-        "exclude_ingredients": {
-          "description": "Drop products containing any of these.",
+        "child_age_years": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Drop products whose minimum age is above this age.",
+          "title": "Child Age Years"
+        },
+        "exclude_features": {
+          "description": "Drop products whose warnings or features mention any of these, e.g. 'small parts', 'batteries'.",
           "items": {
             "type": "string"
           },
-          "title": "Exclude Ingredients",
+          "title": "Exclude Features",
           "type": "array"
         }
       },
@@ -165,45 +179,6 @@
               "description": "Catalog price in USD. None if missing in the dataset.",
               "title": "Price"
             },
-            "size_value": {
-              "anyOf": [
-                {
-                  "type": "number"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Package size, e.g. 16.0",
-              "title": "Size Value"
-            },
-            "size_unit": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Normalized unit, e.g. 'oz'.",
-              "title": "Size Unit"
-            },
-            "price_per_unit": {
-              "anyOf": [
-                {
-                  "type": "number"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "price / size_value, for fair comparison.",
-              "title": "Price Per Unit"
-            },
             "rating": {
               "anyOf": [
                 {
@@ -218,7 +193,35 @@
               "default": null,
               "title": "Rating"
             },
-            "ingredients": {
+            "min_age_years": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Manufacturer's recommended minimum age. None means not stated, not 'any age'.",
+              "title": "Min Age Years"
+            },
+            "max_age_years": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Recommended maximum age, if stated.",
+              "title": "Max Age Years"
+            },
+            "safety_warnings": {
               "anyOf": [
                 {
                   "items": {
@@ -231,8 +234,8 @@
                 }
               ],
               "default": null,
-              "description": "None means unknown, not 'no ingredients'.",
-              "title": "Ingredients"
+              "description": "Warnings from the listing, e.g. 'choking hazard: small parts'. None means unknown, not 'no warnings'.",
+              "title": "Safety Warnings"
             },
             "features_snippet": {
               "anyOf": [
@@ -299,7 +302,7 @@
     "inputSchema": {
       "properties": {
         "query": {
-          "description": "Search text, e.g. 'Brand X steel cleaner price'.",
+          "description": "Search text, e.g. 'LEGO Classic 11001 price'.",
           "minLength": 1,
           "title": "Query",
           "type": "string"
