@@ -3,11 +3,16 @@ name = "agentic-voice-shopping-assistant"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
+    "av>=14,<17",
     "doit>=0.37.0",
+    "faster-whisper>=1.2.1",
     "kagglehub>=1.0.3",
+    "openai>=3.59.0",
     "polars>=2.1.0",
     "pydantic>=2.14.4",
     "python-dotenv>=1.2.4",
+    "pyttsx3>=2.99",
+    "streamlit>=1.67.0",
 ]
 
 # Installs `contracts` and `config` (editable) on `uv sync`, so they import from any
@@ -18,3 +23,8 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["contracts", "config"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]

@@ -30,6 +30,9 @@ REVIEWS_PARQUET = PROCESSED_DIR / "reviews.parquet"  # optional
 # Vector index (Data & RAG writes it, the MCP server reads it)
 INDEX_DIR = DATA_DIR / "index"
 
+# Prompts disclosed for grading (prompts/README.md); code loads them from here
+PROMPTS_DIR = ROOT / "prompts"
+
 # Runtime output
 LOGS_DIR = DATA_DIR / "logs"  # tool-call logs (MCP), read for the ProofAgent failure analysis
 AUDIO_DIR = DATA_DIR / "audio"  # recordings and TTS output (Voice & UI)
