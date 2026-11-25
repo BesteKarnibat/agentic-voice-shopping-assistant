@@ -211,6 +211,29 @@ def llm_answer(state: AgentState, picks, rows, left_out) -> tuple[str, str, dict
     return draft.answer.strip(), draft.spoken_summary.strip(), meta
 
 
+FILLER_RE = re.compile(r"^.*\b(left out no|no products were left out|nothing was left out)\b.*$\n?", re.I | re.M)
+
+
+def drop_filler(answer: str, left_out: list[str]) -> str:
+    """Remove a 'left out nothing' line the model sometimes adds when nothing was left out."""
+    return answer if left_out else FILLER_RE.sub("", answer).strip()
+
+
+def keep_cited(answer: str, picks, rows, citations):
+    """Keep only the products the LLM's answer actually cites, so the table matches the text.
+
+    If the answer cites nothing, everything is kept and the Critic reports the missing markers.
+    """
+    used = set(MARKER_RE.findall(answer))
+    keep = [i for i, row in enumerate(rows) if used & set(row["citation_markers"])]
+    if not keep or len(keep) == len(rows):
+        return picks, rows, citations
+    picks = [picks[i] for i in keep]
+    rows = [{**rows[i], "rank": n} for n, i in enumerate(keep, start=1)]
+    markers = {m for row in rows for m in row["citation_markers"]}
+    return picks, rows, [c for c in citations if c["marker"] in markers]
+
+
 # ---------------------------------------------------------------- node
 
 def answerer_node(state: AgentState) -> dict:
@@ -223,8 +246,13 @@ def answerer_node(state: AgentState) -> dict:
     answer, spoken = template_answer(picks, rows, left_out)
     if picks and get_llm_settings("answerer").provider != "fake":
         try:
-            answer, spoken, meta = llm_answer(state, picks, rows, left_out)
-            source = "llm"
+            llm_text, llm_spoken, meta = llm_answer(state, picks, rows, left_out)
+            if MARKER_RE.search(llm_text):
+                answer, spoken, source = drop_filler(llm_text, left_out), llm_spoken, "llm"
+                picks, rows, citations = keep_cited(answer, picks, rows, citations)
+                warn = needs_warning_note(state, picks)
+            else:  # an uncited answer is never shown; the template is fully cited
+                source = "template (LLM answer had no citation markers)"
         except Exception as e:  # noqa: BLE001
             errors.append(f"answerer: LLM call failed, used template: {e}")
             meta = {"error": str(e)}

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import re
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -29,13 +30,41 @@ RATING_RE = re.compile(r"(\d(?:\.\d)?)\s*(?:-|\s)?(?:out of 5\s*)?stars?\b", re.
 MARKER_RE = re.compile(r"\[(\d+)\]")
 
 
+# LLM issues about these are dropped: code checks them exactly, and small models misjudge them.
+CODE_CHECKED = re.compile(r"\b(age|ages|years? old|year-old|month|budget|price|priced|cost|\$|rating|rated|stars?|"
+                          r"citation|cite|marker|warnings?)\b", re.I)
+
+
+class ReviewIssue(BaseModel):
+    kind: Literal["unsupported_claim", "safety_issue"]
+    quote: str = Field(..., description="The exact words from the answer or spoken summary that are wrong.")
+    problem: str = Field(..., description="One sentence: which product ([n]) and what the evidence says instead.")
+
+
 class CriticReview(BaseModel):
     """LLM output for the Critic."""
 
-    unsupported_claims: list[str] = Field(default_factory=list,
-                                          description="Statements the evidence does not support. Empty if none.")
-    safety_issues: list[str] = Field(default_factory=list,
-                                     description="Violations of the guardrails output check. Empty if none.")
+    issues: list[ReviewIssue] = Field(default_factory=list, description="Empty if the draft is fine.")
+
+
+def _norm(text: str) -> str:
+    return " ".join(re.sub(r"[^a-z0-9$.%+ ]", " ", text.lower()).split())
+
+
+def filter_review(review: CriticReview, answer: str, spoken: str) -> tuple[list[str], list[str], list[dict]]:
+    """Keep LLM issues that quote the draft and are not about code-checked facts."""
+    text = _norm(answer + " " + spoken)
+    unsupported, safety, dropped = [], [], []
+    for issue in review.issues:
+        quote = _norm(issue.quote)
+        if not quote or quote not in text:
+            dropped.append({**issue.model_dump(), "why": "quote not found in the draft"})
+        elif CODE_CHECKED.search(issue.problem):
+            dropped.append({**issue.model_dump(), "why": "code-checked fact"})
+        else:
+            msg = f'"{issue.quote.strip()}": {issue.problem.strip()}'
+            (unsupported if issue.kind == "unsupported_claim" else safety).append(msg)
+    return unsupported, safety, dropped
 
 
 def _money(x: float | None) -> float | None:
@@ -126,12 +155,14 @@ def llm_review(state: AgentState) -> tuple[CriticReview, dict]:
 
 def critic_node(state: AgentState) -> dict:
     issues = code_checks(state)
-    meta, errors, reviewed = {}, [], False
+    meta, errors, reviewed, dropped = {}, [], False, []
     if state.get("comparison_table") and get_llm_settings("critic").provider != "fake":
         try:
             review, meta = llm_review(state)
-            issues["unsupported_claims"] += [s for s in review.unsupported_claims if s.strip()]
-            issues["safety_issues"] += [s for s in review.safety_issues if s.strip()]
+            unsupported, safety, dropped = filter_review(review, state.get("final_answer") or "",
+                                                         state.get("spoken_summary") or "")
+            issues["unsupported_claims"] += unsupported
+            issues["safety_issues"] += safety
             reviewed = True
         except Exception as e:  # noqa: BLE001
             errors.append(f"critic: LLM review failed, used code checks only: {e}")
@@ -145,7 +176,8 @@ def critic_node(state: AgentState) -> dict:
     summary = ("approved" if approved else f"rejected: {len(all_issues)} issue(s)") \
         + (" (code checks + LLM review)" if reviewed else " (code checks)")
     out = {"critic": verdict, "revision_count": revision,
-           **log_step("critic", summary, verdict=verdict, llm_review=reviewed, **meta)}
+           **log_step("critic", summary, verdict=verdict, llm_review=reviewed,
+                      llm_issues_dropped=dropped, **meta)}
     if errors:
         out["errors"] = errors
     return out
