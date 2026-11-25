@@ -86,7 +86,7 @@ transcript text. Voice is tested with the audio fixtures above.
 
 | Setting | Where | Value |
 |---------|-------|-------|
-| `PROOFAGENT_API_KEY` | `.env` (secret) | Evaluation key from the ProofAgent workspace |
+| `PROOFAGENT_API_KEY` | `.env` (secret) | Workspace key; works for evaluation uploads and the Nano guardrail scan |
 | `PROOFAGENT_API_BASE_URL` | config | `https://app.proofagent.ai` |
 | Judge model (`PROOFAGENT_LLM`) | config | A different provider from the agent's LLM; uses that provider's key from `.env` |
 
@@ -103,8 +103,14 @@ uv run proof run eval/agent.py \
   --traps <comma-separated scenario names> \
   --turns 6 --seed 42 \
   --json data/eval/report.json \
-  --agent "Toy shopping assistant" --upload
+  --agent "toy-shopping-assistant" --agent-version v1 \
+  --profile default_multi_turn \
+  --upload --fail-on block
 ```
+
+`--agent-version` is bumped for each run we compare (v1 = first run Sat Nov 28, v2 = after the fix loop), so the
+dashboard shows the two scorecards side by side. `--fail-on block` makes the command exit non-zero only on a
+"block" decision.
 
 Tool names in the scenarios are `rag.search` and `web.search`, as the Retriever calls them (`config/graph.py`).
 
