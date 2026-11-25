@@ -35,4 +35,5 @@ RAG_EVAL_DIR = DATA_DIR / "eval"  # retrieval evaluation output (rag/eval)
 
 # Runtime output
 LOGS_DIR = DATA_DIR / "logs"  # tool-call logs (MCP), read for the ProofAgent failure analysis
+TOOL_CALLS_LOG = LOGS_DIR / "tool_calls.jsonl"  # one JSON line per MCP tool call (request + response)
 AUDIO_DIR = DATA_DIR / "audio"  # recordings and TTS output (Voice & UI)
