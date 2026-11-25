@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 
-TABLE_TOP_N = 3  # deliverables.md 1.4: top 3, Product | Price | Rating | Ingredients | Source | Citation
+TABLE_TOP_N = 3  # deliverables.md 1.4: top 3, Product | Price | Rating | Age range | Warnings | Source | Citation
 
 _SOURCE_LABEL = {"catalog": "Catalog", "web": "Live web", "unknown": "Unknown"}
 
@@ -19,7 +19,9 @@ def comparison_rows(state: dict, top_n: int = TABLE_TOP_N) -> list:
             "Product": r.get("title"),
             "Price": f"${price:.2f}" if price is not None else "n/a",
             "Rating": r.get("rating") if r.get("rating") is not None else "n/a",
-            "Ingredients": ", ".join(r["ingredients"]) if r.get("ingredients") else "unknown",
+            # None means the source doesn't state it (contracts/state.py ComparisonRow), so say "not stated".
+            "Age range": r.get("age_range") or "not stated",
+            "Warnings": "; ".join(r["safety_warnings"]) if r.get("safety_warnings") else "none stated",
             "Source": _SOURCE_LABEL.get(r.get("price_source") or "unknown", r.get("price_source")),
             "Citation": " ".join(r.get("citation_markers") or []),
         })

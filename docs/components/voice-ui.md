@@ -68,7 +68,7 @@ The screen is split in half. **Left:** the voice chat. **Right:** everything the
 | Right | Transcript timestamps | `asr_segments` |
 | Right | Routing and safety (intent, safety check, clarification) | `intent`, `safety`, `clarification_question` |
 | Right | Agent steps (expandable, with details) | `step_log` |
-| Right | Product comparison, top 3: Product, Price, Rating, Ingredients, Source, Citation | `comparison_table` |
+| Right | Product comparison, top 3: Product, Price, Rating, Age range, Warnings, Source, Citation | `comparison_table` |
 | Right | Citations | `citations` |
 | Right | Private document IDs | `citations` (private), `comparison_table.doc_id` |
 | Right | Live-source links | `citations` (web), `comparison_table.live_url`, `web_results` |
@@ -90,7 +90,7 @@ The exact `run_agent()` signature is still open in [infrastructure.md](../infras
 uv run python -m asr sample.wav --model small --words
 
 # Speak a sentence
-uv run python -m tts "I'd go with Method Daily Granite cleaner at nine dollars."
+uv run python -m tts "I'd go with Catan Junior at about twenty dollars, for ages six and up."
 
 # Launch the UI
 uv run streamlit run app/streamlit_app.py
@@ -113,8 +113,5 @@ faster-whisper 1.2.1, so it is pinned), `openai`, `pyttsx3`, and `pytest` as a d
 - **Measured so far:** one 7.4 s recording transcribed on CPU with `small` in 5.2 s. Word error rate not measured.
 - **Not measured yet:** word error rate and OpenAI TTS latency. The offline voice has been run for real; OpenAI TTS
   has not (no API key during development).
-- **Voice round trip tested** with a test-only `run_agent` stand-in (kept outside the repo): offline TTS made a
-  spoken request, Whisper transcribed it correctly, and the 10.7 s spoken reply transcribed back word for word.
-  In the browser the reply autoplayed once and did not replay on later reruns.
 - **No conversation memory:** each turn calls `run_agent` with only the latest transcript.
 - **Lead-in length** (500 ms) is a guess; raise `TTS_LEAD_IN_MS` if the first word is still clipped.

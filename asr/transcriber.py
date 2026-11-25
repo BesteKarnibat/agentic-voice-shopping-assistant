@@ -17,7 +17,7 @@ from config.paths import PROMPTS_DIR
 SAMPLE_RATE = 16_000
 
 # Biases decoding toward shopping vocabulary, brands and prices; helps with
-# accented speech where "fifteen" / "fifty" or brand names are easily confused.
+# accented speech where "thirteen" / "thirty" or brand names are easily confused.
 # Disclosed in prompts/asr_initial_prompt.md and loaded from there.
 DEFAULT_PROMPT = (PROMPTS_DIR / "asr_initial_prompt.md").read_text(encoding="utf-8").strip()
 

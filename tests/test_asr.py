@@ -5,7 +5,7 @@ from asr.transcriber import Segment, TranscriptionResult
 
 
 class Fake:
-    def __init__(self, text="recommend a cleaner under fifteen dollars"):
+    def __init__(self, text="recommend a board game under thirty dollars"):
         self.text = text
         self.calls = []
 

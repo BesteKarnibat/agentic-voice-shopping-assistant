@@ -16,7 +16,7 @@ class FakeBackend:
 
 
 def test_summary_strips_markers_and_limits_words():
-    s = build_spoken_summary("Try Method Cleaner [1], only $9 **today**. " + "More words. " * 40)
+    s = build_spoken_summary("Try Catan Junior [1], only $19 **today**. " + "More words. " * 40)
     assert "[1]" not in s and "*" not in s
     assert len(s.split()) <= 40 and s.endswith(".")
 
