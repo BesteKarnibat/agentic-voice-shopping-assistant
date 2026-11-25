@@ -15,8 +15,9 @@ from mcp_server.web_search import web_search
 
 log = logging.getLogger("mcp-server")
 
-# rag_search() loads its models lazily and without a lock, so a search that arrives while the
-# warm-up is still loading would see half-built state. One lock serves both paths.
+# rag_search() loads its models lazily and without a lock. The warm-up normally loads them before
+# the server starts serving; the lock covers the case where it failed and two searches then race
+# to load them.
 _rag_lock = threading.Lock()
 
 
