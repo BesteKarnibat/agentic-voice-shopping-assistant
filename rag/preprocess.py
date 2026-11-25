@@ -127,6 +127,12 @@ def age_bounds(age_range, text):
             lo, hi = _to_years(m.group(1), lo_unit), _to_years(m.group(3), m.group(4))
             if hi < lo:  # corrupt source like '14-1 years': keep the minimum, drop the unreliable max
                 hi = None
+            # '3 months-8 years' on a listing that says 'Ages 8+': the source's range tops out at the
+            # real minimum age, so it is "up to N", not "N and under". Trust the listing text.
+            if hi is not None and isinstance(text, str):
+                t = re.search(r"\bages?:?\s*(\d{1,2})\s*(?:\+|(?:and|&)\s*up)", text, re.I)
+                if t and float(t.group(1)) == hi and lo < hi:
+                    return hi, None, "text"
             return lo, hi, "structured"
         m = re.fullmatch(r"(\d+(?:\.\d+)?)\s*(months?|years?)\s*and up", age_range)
         if m:

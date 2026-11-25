@@ -19,6 +19,7 @@ CASES = [
 
 
 def main():
+    sys.stdout.reconfigure(encoding="utf-8")  # product titles have non-ASCII chars; Windows defaults to cp1252
     failures = 0
     for name, kw in CASES:
         out = rag_search(RagSearchInput(**kw))
