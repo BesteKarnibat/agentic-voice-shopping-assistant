@@ -1,6 +1,6 @@
 # MCP server and tool schemas
 
-**Owner:** Juan · **Branch:** `feature/mcp` · **Status:** todo
+**Owner:** Juan · **Branch:** `feature/mcp` · **Status:** draft
 **Code:** TODO (MCP server) · **Contract:** [../../contracts/tool_schemas.py](../../contracts/tool_schemas.py), generated [../../contracts/tool_schemas.json](../../contracts/tool_schemas.json)
 
 ## 1. Overview
@@ -9,12 +9,18 @@ TODO
 
 ## 2. Tools
 
+Each tool is built around one purpose:
+
 ### `rag.search`
-<!-- Purpose, when the Planner should use it, input/output tables copied from the Pydantic models, one example request/response. -->
+**Purpose:** Use it for product facts (what a product is, what it contains, how it is rated, and its catalog price), because the private catalog is our primary, citable source, and every fact is cited by its `doc_id`.
+
+<!-- When the Planner should use it, input/output tables copied from the Pydantic models, one example request/response. -->
 TODO
 
 ### `web.search`
-<!-- Same. Provider used, allowed domains, what is returned (always includes source URL). -->
+**Purpose:** Use it only to check what the live web reports right now (current price or availability), or to fill a gap the catalog cannot answer; it returns only what the search API provides and never visits store pages, so every live fact is cited by its URL.
+
+<!-- Provider used, allowed domains, what is returned (always includes source URL). -->
 TODO
 
 ## 3. `web.search` controls
