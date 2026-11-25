@@ -27,8 +27,10 @@ from config.paths import (
 
 PYTHON = sys.executable  # the uv venv interpreter, since doit runs via `uv run doit`
 
+# Default chain (Devanshu): download → preprocess → index → app. Ends with the agent demo until
+# the app task lands.
 DOIT_CONFIG = {
-    "default_tasks": ["download_kaggle_dataset"],
+    "default_tasks": ["download_kaggle_dataset", "preprocess", "index", "agent_demo"],
     "verbosity": 2,  # show the output of each task
 }
 
@@ -85,3 +87,34 @@ def task_rag_sample_eval():
 def task_rag_eval():
     """Score retrieval (recall@k, MRR, filter checks). Output: data/eval/EVAL_REPORT.md."""
     return {"actions": [f'"{PYTHON}" -m rag.eval.run_eval'], "file_dep": [CHROMA_DIR / "chroma.sqlite3"]}
+
+
+# ---------------------------------------------------------------------------
+# LangGraph agent (Devanshu)
+# ---------------------------------------------------------------------------
+
+
+def task_test_graph():
+    """Run the agent test suite offline (fake LLM + mock MCP server, no API key needed)."""
+    return {
+        "actions": [f'"{PYTHON}" -m pytest -q'],
+        "uptodate": [False],  # always run
+    }
+
+
+def task_agent_demo():
+    """Run run_agent() on three sample queries (LLM_PROVIDER=fake for offline)."""
+    return {
+        "actions": [f'"{PYTHON}" -m agent --demo'],
+        "uptodate": [False],
+    }
+
+
+def task_agent_ask():
+    """Ask the agent one question: uv run doit agent_ask -q "board game under $30"."""
+    return {
+        "actions": [f'"{PYTHON}" -m agent %(q)s'],
+        "params": [{"name": "q", "short": "q", "default": "Recommend a card game for family night.",
+                    "help": "user request text"}],
+        "uptodate": [False],
+    }

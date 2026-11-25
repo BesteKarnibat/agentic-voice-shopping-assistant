@@ -39,18 +39,18 @@ Decide as a team and record the answer here.
 
 **Technical decisions (close on Fri Nov 20)**
 
-- [ ] LLM provider/model for development and for the demo, and who pays for the API keys.
+- [x] LLM provider/model: OpenAI `gpt-4o-mini` by default, Anthropic `claude-haiku-5-5` as the tested alternative; swapped with `LLM_PROVIDER` / `LLM_MODEL` through LangChain `init_chat_model` ([config/llm.py](../config/llm.py)). Who pays for the demo key: still open. See [decisions/graph-decisions.md](decisions/graph-decisions.md).
 - [ ] Embedding model (local or API).
 - [ ] ASR (local Whisper or API) and TTS provider.
 - [ ] Web-search API: Brave or Serper (Juan).
-- [ ] MCP transport: stdio or HTTP/SSE (Juan, with Devanshu).
+- [ ] MCP transport: **stdio proposed** (Devanshu; the graph client and mock server use it). Waiting for Juan to confirm.
 - [ ] Vector store: FAISS or Chroma (Akshaj).
 - [x] Data slice of the Amazon dataset: **Toys & Games**. Contracts updated with age and safety-warning fields (see section 1.1 of [deliverables.md](../docs_assignment/deliverables.md)).
 
 **Interfaces not yet in `contracts/`**
 
 - [ ] `rag_search()` signature (Akshaj ↔ Juan). Proposal: `rag_search(RagSearchInput) -> RagSearchOutput`.
-- [ ] `run_agent()` signature (Devanshu ↔ Alekhya, Beste).
+- [x] `run_agent()` signature: `run_agent(transcript, *, session_id=None, asr_segments=None, on_step=None) -> AgentState` (sync, never raises). See [components/langgraph.md](components/langgraph.md#6-entry-point-and-observability).
 - [ ] How ProofAgent calls the agent: audio or transcript (Beste ↔ Devanshu).
 
 **Organization**
