@@ -64,7 +64,7 @@ state: dict = run_agent(
   the step log live. The full log is also in the returned state.
 - **Errors:** never raises for agent failures. Tool, LLM and MCP failures go to `errors`; `final_answer` and
   `spoken_summary` always contain speakable text.
-- **Timeout:** `RUN_TIMEOUT_S` (default 120 s) → partial state + an `errors` entry.
+- **Timeout:** `RUN_TIMEOUT_S` (default 240 s, longer than the MCP server's cold start) → partial state + an `errors` entry.
 - One turn per call (no multi-turn memory yet). A clarifying question comes back as `final_answer` with `intent = "unclear"`;
   the UI sends the user's reply as a new transcript.
 

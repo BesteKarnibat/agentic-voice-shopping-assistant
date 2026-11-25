@@ -18,9 +18,9 @@ def _env_int(name: str, default: int) -> int:
 MCP_SERVER_COMMAND: str = os.getenv("MCP_SERVER_COMMAND", sys.executable)
 MCP_SERVER_ARGS: str = os.getenv("MCP_SERVER_ARGS", "-m mcp_server")
 MCP_TOOL_TIMEOUT_S: float = _env_float("MCP_TOOL_TIMEOUT_S", 30.0)
-# First call on a new connection waits for the server to load the embedding model and reranker.
 MCP_FIRST_CALL_TIMEOUT_S: float = _env_float("MCP_FIRST_CALL_TIMEOUT_S", 120.0)
-MCP_STARTUP_TIMEOUT_S: float = _env_float("MCP_STARTUP_TIMEOUT_S", 60.0)
+# The server loads its models before the handshake: ~12 s warm, ~70 s on a fresh venv.
+MCP_STARTUP_TIMEOUT_S: float = _env_float("MCP_STARTUP_TIMEOUT_S", 180.0)
 
 RAG_TOOL = "rag.search"
 WEB_TOOL = "web.search"
@@ -50,4 +50,4 @@ TOP_N_ANSWER: int = 3
 SPOKEN_SUMMARY_MAX_WORDS: int = 40
 
 # run_agent
-RUN_TIMEOUT_S: float = _env_float("RUN_TIMEOUT_S", 120.0)
+RUN_TIMEOUT_S: float = _env_float("RUN_TIMEOUT_S", 240.0)  # must exceed MCP_STARTUP_TIMEOUT_S

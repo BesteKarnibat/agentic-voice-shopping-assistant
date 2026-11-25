@@ -79,7 +79,7 @@ The contract is [contracts/state.py](../../contracts/state.py); this is how data
   `revision_count ≤ MAX_CRITIC_REVISIONS` (2). So there are at most 2 rewrites, then `finalize` returns the last
   draft and adds an error.
 - **Failure paths:** LLM failure in the Router → clarifying "please rephrase"; in the Planner → a catalog-only fallback
-  plan; MCP server down or a tool error → `errors`, the graph continues; overall timeout (`RUN_TIMEOUT_S`, 120 s) → partial
+  plan; MCP server down or a tool error → `errors`, the graph continues; overall timeout (`RUN_TIMEOUT_S`, 240 s) → partial
   state. `run_agent()` never raises and always returns a speakable `final_answer`.
 
 ## 5. Model configuration
@@ -115,7 +115,7 @@ state = run_agent(transcript, session_id=None, asr_segments=None, on_step=None)
 | Component | Default | Mock / swap |
 |-----------|---------|-------------|
 | MCP server | Juan's [mcp_server/](../../mcp_server/) (`MCP_SERVER_ARGS="-m mcp_server"` in [config/graph.py](../../config/graph.py)), backed by Akshaj's `rag_search()` and Serper | `MCP_SERVER_ARGS="-m mocks.mcp_server"` runs [mocks/mcp_server.py](../../mocks/mcp_server.py) on 12 fake products ([mocks/fake_catalog.py](../../mocks/fake_catalog.py)); the offline tests always use it. |
-| First tool call | waits up to `MCP_FIRST_CALL_TIMEOUT_S` (120 s) while the server loads the embedding model and reranker | later calls: `MCP_TOOL_TIMEOUT_S` (30 s) |
+| Server start | waits up to `MCP_STARTUP_TIMEOUT_S` (180 s): the server loads the embedding model and reranker before the handshake (~12 s warm, ~70 s on a fresh venv) | first tool call: `MCP_FIRST_CALL_TIMEOUT_S` (120 s); later calls: `MCP_TOOL_TIMEOUT_S` (30 s) |
 | Answerer / Critic | stub: [agent/nodes/answerer_stub.py](../../agent/nodes/answerer_stub.py) | One import line in [agent/graph.py](../../agent/graph.py). The interface they must match is at the top of the stub file. |
 
 ## 8. Decisions, limitations, and known issues
