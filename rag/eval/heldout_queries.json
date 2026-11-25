@@ -1,0 +1,110 @@
+[
+  {
+    "id": "H1",
+    "type": "known_item",
+    "query": "mini plush of Katerina Kittycat from Daniel Tiger",
+    "filters": {},
+    "expected_doc_ids": [
+      "2e14394c7039d04f6bf5318b478a5c7a"
+    ]
+  },
+  {
+    "id": "H2",
+    "type": "known_item",
+    "query": "collection of Kanoodle brain teaser puzzle games",
+    "filters": {},
+    "expected_doc_ids": [
+      "68dcd11441e8ed52b3e2eb9388f92391"
+    ]
+  },
+  {
+    "id": "H3",
+    "type": "known_item",
+    "query": "lettered tile game for building vocabulary and spelling, ages 7 and up",
+    "filters": {},
+    "expected_doc_ids": [
+      "b5bed185ea31530408ee93e7f0f6b03c"
+    ]
+  },
+  {
+    "id": "H4",
+    "type": "known_item",
+    "query": "3D crystal jigsaw puzzle of a panda and baby animals",
+    "filters": {},
+    "expected_doc_ids": [
+      "c8a17a85dd35e9f7b2ab9bbd1dd1effa"
+    ]
+  },
+  {
+    "id": "H5",
+    "type": "known_item",
+    "query": "foam shot put for kids",
+    "filters": {},
+    "expected_doc_ids": [
+      "4026b687b2d6bb8cf80335e6360d39ae"
+    ]
+  },
+  {
+    "id": "H6",
+    "type": "known_item",
+    "query": "board game about becoming the new Don in the Godfather",
+    "filters": {},
+    "expected_doc_ids": [
+      "5cfdc7d710f2d88c1c5628c181f4342c"
+    ]
+  },
+  {
+    "id": "H7",
+    "type": "known_item",
+    "query": "kids drawing board easel in primary colors",
+    "filters": {},
+    "expected_doc_ids": [
+      "249930434d4f573039be4de690fe206e"
+    ]
+  },
+  {
+    "id": "H8",
+    "type": "known_item",
+    "query": "unicorn doll with a squeezable belly for making slime",
+    "filters": {},
+    "expected_doc_ids": [
+      "fb504464fd8a89ab8bb01d52374902de"
+    ]
+  },
+  {
+    "id": "H9",
+    "type": "known_item",
+    "query": "child's Mysterio costume from Spider-Man Far From Home, size large",
+    "filters": {},
+    "expected_doc_ids": [
+      "0381a6a08600eae055fd4e513aad7843"
+    ]
+  },
+  {
+    "id": "H10",
+    "type": "known_item",
+    "query": "VTech electronic write and learn creative center",
+    "filters": {},
+    "expected_doc_ids": [
+      "b6799304afca9ccd4f46c82df9d531d2"
+    ]
+  },
+  {
+    "id": "H11",
+    "type": "known_item",
+    "query": "NASCAR 1:24 diecast Ford Mustang driven by Aric Almirola",
+    "filters": {},
+    "expected_doc_ids": [
+      "19873a1f70262019c56e81afb3002a2c"
+    ]
+  },
+  {
+    "id": "H12",
+    "type": "known_item",
+    "query": "pirate ship playset that doubles as a baby talk carrier",
+    "filters": {},
+    "expected_doc_ids": [
+      "2d5e7261022fc03bee16074d8a833b97"
+    ]
+  }
+]
