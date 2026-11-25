@@ -41,8 +41,8 @@ so they append. Conditional edges are small functions of the state ([agent/graph
 | `planner` | Tools (RAG / web), search text, filters, comparison criteria | `transcript`, `intent`, `constraints` | `plan` | [planner_system.md](../../prompts/planner_system.md) | LLM (structured output) |
 | `retriever` | Execute the plan through MCP | `plan` | `rag_results`, `web_results`, `errors` | policy: [retriever_tools.md](../../prompts/retriever_tools.md) | `rag.search`, `web.search` |
 | `reconcile` | Match catalog ↔ live, flag price conflicts, choose price | `rag_results`, `web_results`, `constraints`, `intent` | `reconciled` | policy: [retriever_tools.md](../../prompts/retriever_tools.md) | none |
-| `answerer` | **Stub** → Beste (#46): top 3, citations, spoken summary | all of the above, `critic` | `draft_answer`, `final_answer`, `comparison_table`, `citations`, `spoken_summary` | `answerer_system.md` (Beste) | stub: none |
-| `critic` | **Stub** → Beste (#47): grounding, budget, age checks | answer fields | `critic`, `revision_count` | `critic_system.md` (Beste) | stub: none |
+| `answerer` | Beste (#46): top 3, citations, spoken summary | all of the above, `critic` | `draft_answer`, `final_answer`, `comparison_table`, `citations`, `spoken_summary` | [answerer_system.md](../../prompts/answerer_system.md) (Beste) | LLM (structured output); template with the fake provider |
+| `critic` | Beste (#47): code checks (citations, prices, budget, age) + LLM review | answer fields | `critic`, `revision_count` | [critic_system.md](../../prompts/critic_system.md) (Beste) | LLM (structured output); code checks only with the fake provider |
 | `finalize` | Close the run; record an error if never approved | `critic`, `revision_count` | `errors` (if not approved) | — | none |
 
 Every node appends one `step_log` entry (`log_step(node, summary, **details)`).
@@ -116,7 +116,7 @@ state = run_agent(transcript, session_id=None, asr_segments=None, on_step=None)
 |-----------|---------|-------------|
 | MCP server | Juan's [mcp_server/](../../mcp_server/) (`MCP_SERVER_ARGS="-m mcp_server"` in [config/graph.py](../../config/graph.py)), backed by Akshaj's `rag_search()` and Serper | `MCP_SERVER_ARGS="-m mocks.mcp_server"` runs [mocks/mcp_server.py](../../mocks/mcp_server.py) on 12 fake products ([mocks/fake_catalog.py](../../mocks/fake_catalog.py)); the offline tests always use it. |
 | Server start | waits up to `MCP_STARTUP_TIMEOUT_S` (180 s): the server loads the embedding model and reranker before the handshake (~12 s warm, ~70 s on a fresh venv) | first tool call: `MCP_FIRST_CALL_TIMEOUT_S` (120 s); later calls: `MCP_TOOL_TIMEOUT_S` (30 s) |
-| Answerer / Critic | stub: [agent/nodes/answerer_stub.py](../../agent/nodes/answerer_stub.py) | One import line in [agent/graph.py](../../agent/graph.py). The interface they must match is at the top of the stub file. |
+| Answerer / Critic | Beste's [answerer.py](../../agent/nodes/answerer.py) and [critic.py](../../agent/nodes/critic.py); the LLM review is skipped with `LLM_PROVIDER=fake` | Imported in [agent/graph.py](../../agent/graph.py); with the fake provider both nodes use code only (template answer, code checks). |
 
 ## 8. Decisions, limitations, and known issues
 
