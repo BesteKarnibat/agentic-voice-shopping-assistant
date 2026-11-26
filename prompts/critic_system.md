@@ -16,7 +16,8 @@ The Critic runs in two layers:
 2. **LLM review (this prompt):** reads the answer against the evidence for claims the code can't check
    (features, materials, "safe", "educational", recall status) and for the safety rules in the guardrails.
    Code keeps an LLM issue only if its `quote` appears in the draft and it is not about a code-checked fact
-   (age, budget, price, rating, citations, warnings); dropped issues are logged as `llm_issues_dropped`.
+   (age, budget, price, rating, citations, warnings), and is not merely saying a fact is unknown or not listed;
+   dropped issues are logged as `llm_issues_dropped`.
 
 Both layers feed one `CriticVerdict`. Any issue rejects the draft and its `feedback` goes back to the Answerer.
 The graph allows at most `MAX_CRITIC_REVISIONS` (2) rewrites. The LLM review is skipped with the fake provider and
@@ -59,6 +60,8 @@ Do not flag:
 - General wording with no factual claim ("a fun pick", "great for family night").
 - Facts that are in the evidence, even if paraphrased.
 - Missing details. Leaving something out is not a claim.
+- Saying a fact is unknown or not listed ("stock status is unknown", "ratings aren't listed") when the evidence
+  field is null or "unknown". That is the correct answer, not a claim.
 
 ### `safety_issue`
 
