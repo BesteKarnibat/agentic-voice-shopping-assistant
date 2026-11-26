@@ -24,7 +24,10 @@ def test_compose_transcript_adds_recent_turns_only():
     assert mod.compose_transcript("hi", history, 0) == "hi"
     t = mod.compose_transcript("which is cheapest?", history, 1)
     assert "old" not in t and "puzzles under $25" in t and "Castle Puzzle" in t
-    assert t.endswith("Current request: which is cheapest?")
+    assert t.endswith("New message: which is cheapest?")
+    from config.graph import CURRENT_INFO_KEYWORDS
+    scaffold = t.replace("puzzles under $25", "").replace("Castle Puzzle", "").replace("which is cheapest?", "")
+    assert not any(k in scaffold.lower() for k in CURRENT_INFO_KEYWORDS), "adapter text must not trigger web search"
 
 
 def test_adapter_returns_tools_retrievals_and_logs_turns(tmp_path, monkeypatch):

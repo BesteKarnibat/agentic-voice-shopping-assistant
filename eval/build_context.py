@@ -69,11 +69,30 @@ def catalog_products() -> list[dict]:
     return df.to_dicts()
 
 
+def _share(products: list[dict], key: str) -> str:
+    n = sum(1 for p in products if p.get(key) not in (None, [], ""))
+    return f"{n / len(products):.0%}" if products else "0%"
+
+
 def knowledge_md(products: list[dict]) -> str:
-    head = (f"# Product catalog ({'mock' if cfg.CATALOG == 'mock' else 'Amazon Product Dataset 2020, Toys & Games'})\n\n"
+    """Catalog facts for the judges: what the data contains, plus a sample of products.
+
+    The judges also get each turn's retrieved products (AgentResponse.retrievals), so they can check every
+    answer against the exact evidence; this file tells them what the catalog can and can't support.
+    """
+    name = "mock catalog" if cfg.CATALOG == "mock" else "Amazon Product Dataset 2020, Toys & Games slice"
+    sample = products[: cfg.KNOWLEDGE_MAX_PRODUCTS]
+    head = (f"# Product catalog: {name}\n\n"
             "The only product facts the agent may state come from this catalog (cited by doc_id) or from live web "
-            "results (cited by URL). Prices are 2020 catalog prices unless the answer says it used a live price.\n\n")
-    return head + "\n".join(_product_line(p) for p in products) + "\n"
+            "results (cited by URL). Prices are 2020 catalog prices unless the answer says it used a live price.\n\n"
+            "## What the catalog contains\n\n"
+            f"- {len(products)} products.\n"
+            f"- Price present for {_share(products, 'price')}, minimum age for {_share(products, 'min_age_years')}, "
+            f"star rating for {_share(products, 'rating')}, safety warnings for {_share(products, 'safety_warnings')}.\n"
+            "- When a field is missing, the correct answer says it isn't listed. A missing rating or warning is not "
+            "evidence that a product has none.\n\n"
+            f"## Sample of {len(sample)} products\n\n")
+    return head + "\n".join(_product_line(p) for p in sample) + "\n"
 
 
 def build() -> None:

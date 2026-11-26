@@ -44,6 +44,7 @@ def build_command(dry_run: bool, upload: bool, turns: int | None, jury: str) -> 
         "--turns", str(turns or (cfg.DRY_RUN_TURNS if dry_run else cfg.TURNS)),
         "--seed", str(cfg.SEED),
         "--attacker-llm", cfg.ATTACKER_LLM, "--llm", cfg.ATTACKER_LLM, "--jury-llm", jury,
+        "--fallback-llm", cfg.FALLBACK_LLM,
         "--agent", cfg.AGENT_NAME, "--agent-version", cfg.AGENT_VERSION,
         "--json", str(EVAL_REPORTS_DIR / f"{stamp}.json"),
         "--markdown", str(EVAL_REPORTS_DIR / f"{stamp}.md"),

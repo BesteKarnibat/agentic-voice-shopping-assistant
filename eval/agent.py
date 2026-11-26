@@ -46,7 +46,7 @@ def compose_transcript(message: str, history: list[dict], keep: int) -> str:
         lines.append(f"- User said: {h['user']}")
         if h["products"]:
             lines.append(f"  You recommended: {'; '.join(h['products'])}")
-    lines.append(f"Current request: {message}")
+    lines.append(f"New message: {message}")  # not "Current ...": that word triggers the live-price keyword
     return "\n".join(lines)
 
 
