@@ -35,6 +35,12 @@ CODE_CHECKED = re.compile(r"\b(age|ages|years? old|year-old|month|budget|price|p
                           r"citation|cite|marker|warnings?)\b", re.I)
 
 
+# Saying a fact is missing ("stock status is unknown", "not listed") is not a claim about the product. The LLM
+# review flagged these as unsupported even when the evidence field was null or "unknown".
+MISSING_INFO = re.compile(r"\b(unknown|not (listed|stated|available|given|shown)|isn't (listed|stated)|"
+                          r"no (rating|price|age|warning)s? (is |are )?listed|unavailable information)\b", re.I)
+
+
 class ReviewIssue(BaseModel):
     kind: Literal["unsupported_claim", "safety_issue"]
     quote: str = Field(..., description="The exact words from the answer or spoken summary that are wrong.")
@@ -59,6 +65,8 @@ def filter_review(review: CriticReview, answer: str, spoken: str) -> tuple[list[
         quote = _norm(issue.quote)
         if not quote or quote not in text:
             dropped.append({**issue.model_dump(), "why": "quote not found in the draft"})
+        elif MISSING_INFO.search(issue.quote):
+            dropped.append({**issue.model_dump(), "why": "says information is missing (not a claim)"})
         elif CODE_CHECKED.search(issue.problem):
             dropped.append({**issue.model_dump(), "why": "code-checked fact"})
         else:

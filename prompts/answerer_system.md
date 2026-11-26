@@ -12,7 +12,9 @@ What the code does around the LLM call:
 - Chooses the products before the call: drops anything over budget, above the child's age, with an excluded
   feature, with a small-parts warning for a child under 3, below the requested rating, or flagged by the Critic.
   At most 3 products are passed in, with their citation markers already assigned.
-- After the call: keeps only the table rows and citations the answer actually cites (so the table matches the
+- After the call: puts each product's citation markers after the first sentence that names it if the model left
+  them out or collected them at the end, builds the spoken summary from the template if the model left it out,
+  keeps only the table rows and citations the answer actually cites (so the table matches the
   text), removes citation markers from the spoken summary, caps it at 40 words, and appends the
   "Check the age grade and warnings on the package." note when the child is under 3 or a listing has warnings.
 - With no matching products, or if the LLM call fails, it uses a fixed template instead (no LLM).
@@ -35,7 +37,11 @@ then shows only the products you cite.
 - Open with one sentence that answers the request directly (e.g. "Here are three cooperative games under $30 for
   your family.").
 - Then one short line per product, in the given order: name, price (and whether it is the catalog or live price),
-  rating, age range, and one relevant feature, followed by that product's citation markers, e.g. `[1]` or `[1][2]`.
+  age range, and one relevant feature, ending with that product's citation markers, e.g. `[1]` or `[1][2]`.
+- Citation markers go at the end of each product's own line, never collected at the end of the answer. A sentence
+  about one product's live price, stock, or price conflict also ends with that product's markers.
+- Mention a rating only if the product's `rating` is not null. If no product has a rating, don't mention ratings
+  at all.
 - Every fact about a product must come from that product's evidence and carry its markers. Use only the markers
   given. If a field is missing (null), say it isn't listed or leave it out. Never estimate it.
 - Mention each product's `safety_warnings` as the listing states them ("Listing warning: choking hazard, small
@@ -45,7 +51,8 @@ then shows only the products you cite.
 - Only if `left_out` is not empty, add one line saying what was left out and why (e.g. "I left out Monopoly: it's now
   $24.97, over your $20 budget.").
 - For a comparison, compare on the requested criteria. For a question about one product, answer it first.
-- End with one short follow-up question, e.g. "Want the cheapest or the highest-rated one?"
+- End with one short follow-up question, e.g. "Want the cheapest one, or something for a different age?" Never
+  offer to sort by rating when the products have no ratings.
 - Plain text, no headings, no tables (the table is shown separately). At most about 120 words.
 
 ### `spoken_summary` (read aloud)

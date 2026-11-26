@@ -32,7 +32,8 @@ class AnswerDraft(BaseModel):
     """LLM output for the Answerer."""
 
     answer: str = Field(..., description="On-screen answer with the given [n] citation markers after each fact.")
-    spoken_summary: str = Field(..., description="At most 35 words, no citation markers, for text-to-speech.")
+    # Optional: models sometimes omit it (v1b T22). The code then builds it, instead of discarding the answer.
+    spoken_summary: str = Field("", description="At most 35 words, no citation markers, for text-to-speech.")
 
 
 # ---------------------------------------------------------------- helpers
@@ -219,6 +220,53 @@ def drop_filler(answer: str, left_out: list[str]) -> str:
     return answer if left_out else FILLER_RE.sub("", answer).strip()
 
 
+_SENTENCE_END = re.compile(r"(?<=[.!?])\s+|\n+")
+_TRAILING_MARKERS = re.compile(r"(?:\s*\[\d+\]){2,}\s*$")
+
+
+def _words(text: str) -> list[str]:
+    return re.findall(r"[a-z0-9]+", text.lower())
+
+
+def _title_key(title: str) -> list[str]:
+    """First three words of the title's head, e.g. ['monopoly', 'fortnite', 'edition']."""
+    return _words(short_title(title, 6))[:3]
+
+
+def place_markers(answer: str, rows: list[ComparisonRow]) -> tuple[str, int]:
+    """Put each product's markers after the first sentence that names it; drop a marker cluster left at the end.
+
+    The LLM sometimes writes correct facts but cites them all at the end ("...[1][2][3][4][5]") or not at all,
+    which breaks per-fact citation. Returns (answer, number of products whose markers were placed by code).
+    """
+    trailing = _TRAILING_MARKERS.search(answer)
+    body_before = answer[: trailing.start()] if trailing else answer
+    pieces = _SENTENCE_END.split(answer)
+    seps = _SENTENCE_END.findall(answer)
+    placed = 0
+    for row in rows:
+        key = _title_key(row["title"])
+        if not key or any(m in body_before for m in row["citation_markers"]):
+            continue  # already cited in the text (outside an end-of-answer cluster)
+        for i, piece in enumerate(pieces):
+            words = _words(piece)
+            named = any(words[j:j + len(key)] == key for j in range(len(words) - len(key) + 1)) \
+                or (len(key) >= 2 and words[: len(key)] == key)
+            if not named:
+                continue
+            if not any(m in piece for m in row["citation_markers"]):
+                pieces[i] = piece.rstrip() + " " + "".join(row["citation_markers"])
+                placed += 1
+            break
+    text = "".join(p + (seps[i] if i < len(seps) else "") for i, p in enumerate(pieces))
+    trailing = _TRAILING_MARKERS.search(text)
+    if placed and trailing:
+        body = text[: trailing.start()]
+        if all(m in body for m in MARKER_RE.findall(trailing.group())):  # every marker is now cited in place
+            text = body.rstrip()
+    return text, placed
+
+
 def keep_cited(answer: str, picks, rows, citations):
     """Keep only the products the LLM's answer actually cites, so the table matches the text.
 
@@ -247,8 +295,14 @@ def answerer_node(state: AgentState) -> dict:
     if picks and get_llm_settings("answerer").provider != "fake":
         try:
             llm_text, llm_spoken, meta = llm_answer(state, picks, rows, left_out)
+            llm_text, placed = place_markers(llm_text, rows)
             if MARKER_RE.search(llm_text):
-                answer, spoken, source = drop_filler(llm_text, left_out), llm_spoken, "llm"
+                answer, source = drop_filler(llm_text, left_out), "llm"
+                spoken = llm_spoken.strip() or spoken  # template spoken summary if the model left it out
+                if placed:
+                    source += f" (code placed markers for {placed} product{'s' if placed > 1 else ''})"
+                if not llm_spoken.strip():
+                    source += " (spoken summary from template)"
                 picks, rows, citations = keep_cited(answer, picks, rows, citations)
                 warn = needs_warning_note(state, picks)
             else:  # an uncited answer is never shown; the template is fully cited

@@ -144,6 +144,7 @@ def test_llm_answer_without_markers_falls_back_to_cited_template(monkeypatch):
     class Settings:
         provider = "openai"
     monkeypatch.setattr(ans, "get_llm_settings", lambda node: Settings())
+    # names no product, so code can't place markers: the cited template replaces it
     monkeypatch.setattr(ans, "llm_answer", lambda *a: ("A great pick with no markers.", "Spoken.", {}))
     s = ans.answerer_node(_state([GAME]))
     assert "[1]" in s["final_answer"]
@@ -153,3 +154,52 @@ def test_llm_answer_without_markers_falls_back_to_cited_template(monkeypatch):
 def test_left_out_filler_is_removed():
     from agent.nodes.answerer import drop_filler
     assert drop_filler("Two games [1][2].\nI left out no products.\nWant more?", []) == "Two games [1][2].\nWant more?"
+
+
+def test_markers_collected_at_the_end_are_moved_to_each_product():
+    from agent.nodes.answerer import build_table, place_markers
+    rows, _ = build_table([(GAME[1], GAME[0]), (STACKER[1], STACKER[0])])
+    text = ("Family Card Game Night Edition is $12.99. Rainbow Baby Stacking Rings is $8.99. "
+            "Availability is unknown.[1][2]")
+    fixed, placed = place_markers(text, rows)
+    assert placed == 2
+    assert "Family Card Game Night Edition is $12.99. [1]" in fixed
+    assert "Rainbow Baby Stacking Rings is $8.99. [2]" in fixed
+    assert not fixed.endswith("[1][2]")
+
+
+def test_markers_left_alone_when_already_in_place():
+    from agent.nodes.answerer import build_table, place_markers
+    rows, _ = build_table([(GAME[1], GAME[0])])
+    text = "Family Card Game Night Edition, $12.99 [1]\nWant the cheapest one?"
+    assert place_markers(text, rows) == (text, 0)
+
+
+def test_uncited_llm_answer_is_repaired_instead_of_replaced(monkeypatch):
+    import agent.nodes.answerer as ans
+
+    class Settings:
+        provider = "openai"
+    monkeypatch.setattr(ans, "get_llm_settings", lambda node: Settings())
+    monkeypatch.setattr(ans, "llm_answer",
+                        lambda *a: ("Family Card Game Night Edition is a fun pick at $12.99.", "", {}))
+    s = ans.answerer_node(_state([GAME]))
+    assert s["final_answer"].startswith("Family Card Game Night Edition is a fun pick at $12.99. [1]")
+    src = s["step_log"][0]["details"]["source"]
+    assert src.startswith("llm") and "placed markers" in src and "spoken summary from template" in src
+    assert s["spoken_summary"]  # built from the template
+
+
+def test_markers_not_duplicated_when_cited_later_in_the_line():
+    from agent.nodes.answerer import build_table, place_markers
+    rows, _ = build_table([(GAME[1], GAME[0])])
+    text = "Family Card Game Night Edition costs $12.99. It suits ages 7+. [1]\nWant the cheapest one?"
+    assert place_markers(text, rows) == (text, 0)
+
+
+def test_llm_review_does_not_flag_saying_a_fact_is_unknown():
+    from agent.nodes.critic import CriticReview, filter_review
+    review = CriticReview(issues=[{"kind": "unsupported_claim", "quote": "its stock status is unknown",
+                                   "problem": "[1] states that the availability is unknown."}])
+    unsupported, safety, dropped = filter_review(review, "Monopoly is $15.88, but its stock status is unknown. [1]", "")
+    assert unsupported == [] and dropped[0]["why"].startswith("says information is missing")
