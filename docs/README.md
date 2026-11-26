@@ -10,9 +10,9 @@ sections, replace every `TODO`, and delete guidance comments (`<!-- ... -->`) wh
 
 | Assignment item | File | Owner | Branch | Status |
 |-----------------|------|-------|--------|--------|
-| Data preprocessing and indexing | [components/data-rag.md](components/data-rag.md) | Akshaj | `feature/rag` | todo |
+| Data preprocessing and indexing | [components/data-rag.md](components/data-rag.md) | Akshaj | `feature/rag` | draft |
 | MCP server / tool schemas | [components/mcp.md](components/mcp.md) | Juan | `feature/mcp` | draft |
-| LangGraph architecture | [components/langgraph.md](components/langgraph.md) | Devanshu | `feature/graph` | todo |
+| LangGraph architecture | [components/langgraph.md](components/langgraph.md) | Devanshu | `feature/graph` | draft |
 | Setup, `.env.example`, run/build scripts | [components/setup.md](components/setup.md) | Devanshu | `feature/graph` | todo |
 | Voice and UI usage | [components/voice-ui.md](components/voice-ui.md) | Alekhya | `feature/ui` | todo |
 | Safety considerations | [components/safety.md](components/safety.md) | Beste | `feature/eval` | todo |
