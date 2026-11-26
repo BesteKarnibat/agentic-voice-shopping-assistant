@@ -110,3 +110,46 @@ def test_critic_flags_over_age_product_as_safety_issue():
     s["constraints"]["child_age_years"] = 6
     v = critic_node(s)["critic"]
     assert any("ages 10+" in x for x in v["safety_issues"])
+
+
+def test_table_keeps_only_products_the_answer_cites():
+    from agent.nodes.answerer import build_table, keep_cited
+    picks = [(GAME[1], GAME[0]), (PRICEY[1], PRICEY[0]), (STACKER[1], STACKER[0])]
+    rows, citations = build_table(picks)
+    picks2, rows2, cits2 = keep_cited("Try the card game [1] or the rings [3].", picks, rows, citations)
+    assert [r["doc_id"] for r in rows2] == ["d-game", "d-stack"]
+    assert [r["rank"] for r in rows2] == [1, 2]
+    assert {c["marker"] for c in cits2} == {"[1]", "[3]"}
+    # an answer with no markers keeps everything (the Critic reports it)
+    assert keep_cited("No markers here.", picks, rows, citations)[1] == rows
+
+
+def test_llm_review_issues_must_quote_the_draft_and_skip_code_checked_facts():
+    from agent.nodes.critic import CriticReview, filter_review
+    review = CriticReview(issues=[
+        {"kind": "unsupported_claim", "quote": "made from BPA-free plastic", "problem": "[1] evidence has no BPA."},
+        {"kind": "safety_issue", "quote": "not in the text at all", "problem": "[1] drops a warning."},
+        {"kind": "safety_issue", "quote": "ages 7 and up", "problem": "Recommends [1] (age 7+) for a 6-year-old."},
+    ])
+    answer = "UNO is made from BPA-free plastic, ages 7 and up [1]."
+    unsupported, safety, dropped = filter_review(review, answer, "")
+    assert len(unsupported) == 1 and "BPA" in unsupported[0]
+    assert safety == []
+    assert [d["why"] for d in dropped] == ["quote not found in the draft", "code-checked fact"]
+
+
+def test_llm_answer_without_markers_falls_back_to_cited_template(monkeypatch):
+    import agent.nodes.answerer as ans
+
+    class Settings:
+        provider = "openai"
+    monkeypatch.setattr(ans, "get_llm_settings", lambda node: Settings())
+    monkeypatch.setattr(ans, "llm_answer", lambda *a: ("A great pick with no markers.", "Spoken.", {}))
+    s = ans.answerer_node(_state([GAME]))
+    assert "[1]" in s["final_answer"]
+    assert s["step_log"][0]["details"]["source"].startswith("template")
+
+
+def test_left_out_filler_is_removed():
+    from agent.nodes.answerer import drop_filler
+    assert drop_filler("Two games [1][2].\nI left out no products.\nWant more?", []) == "Two games [1][2].\nWant more?"
