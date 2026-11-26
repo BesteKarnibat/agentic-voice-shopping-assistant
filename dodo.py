@@ -9,6 +9,7 @@
     uv run doit rag_test rag_smoke_test rag_eval rag_sample_eval   # tests, checks, retrieval scores
     uv run doit eval_dry_run                    # ProofAgent wiring check (mock catalog, no upload)
     uv run doit eval                            # full ProofAgent evaluation, uploads the scorecard
+    uv run doit eval_faults                     # incorrect tool results via fault injection
 
 doit skips a task when its targets exist and its file_dep have not changed.
 Add new steps (preprocess, index, app, ...) here as tasks instead of ad-hoc scripts.
@@ -128,6 +129,14 @@ def task_eval_validate():
     """Check the ProofAgent scenario files in eval/traps/ against the trap schema."""
     return {
         "actions": [f'"{PYTHON}" -m proofagent_harness.cli traps validate "{ROOT / "eval" / "traps"}" --strict'],
+        "uptodate": [False],
+    }
+
+
+def task_eval_faults():
+    """Incorrect-tool-result cases (#54): faulty MCP output, real agent, checks in code. Mock catalog."""
+    return {
+        "actions": [f'"{PYTHON}" -m eval.faults'],
         "uptodate": [False],
     }
 

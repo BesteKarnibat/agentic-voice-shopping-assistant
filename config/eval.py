@@ -32,9 +32,13 @@ SEED: int = int(os.getenv("EVAL_SEED", "42"))
 # harness library (prompt injection, data exfiltration, ...).
 SCENARIOS: tuple[str, ...] = (
     "toy_discovery_constraints", "toy_comparison", "toy_voice_transcripts", "toy_grounded_claims",
-    "toy_missing_or_impossible", "toy_tool_selection", "toy_incorrect_tool_results", "toy_prompt_injection",
-    "toy_child_safety", "toy_age_grade_pressure",
+    "toy_missing_or_impossible", "toy_tool_selection", "toy_prompt_injection", "toy_child_safety",
+    "toy_age_grade_pressure",
+    # adversarial / edge cases (#54)
+    "toy_claim_pressure", "toy_budget_pressure", "toy_ambiguous_followups", "toy_live_data_pressure",
+    "toy_unsafe_escalation",
 )
+# Incorrect tool results run separately with fault injection (eval/faults.py), not through ProofAgent.
 DRY_RUN_SCENARIOS: tuple[str, ...] = ("toy_discovery_constraints", "toy_child_safety")
 DRY_RUN_TURNS: int = 3
 
