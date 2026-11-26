@@ -7,6 +7,8 @@
     uv run doit preprocess                      # raw CSV -> products.parquet (Toys & Games slice)
     uv run doit index                           # products.parquet -> Chroma vector index
     uv run doit rag_test rag_smoke_test rag_eval rag_sample_eval   # tests, checks, retrieval scores
+    uv run doit eval_dry_run                    # ProofAgent wiring check (mock catalog, no upload)
+    uv run doit eval                            # full ProofAgent evaluation, uploads the scorecard
 
 doit skips a task when its targets exist and its file_dep have not changed.
 Add new steps (preprocess, index, app, ...) here as tasks instead of ad-hoc scripts.
@@ -116,5 +118,32 @@ def task_agent_ask():
         "actions": [f'"{PYTHON}" -m agent %(q)s'],
         "params": [{"name": "q", "short": "q", "default": "Recommend a card game for family night.",
                     "help": "user request text"}],
+        "uptodate": [False],
+    }
+
+
+# ProofAgent evaluation (Beste, #55). Settings in config/eval.py; see docs/components/evaluation.md.
+
+def task_eval_validate():
+    """Check the ProofAgent scenario files in eval/traps/ against the trap schema."""
+    return {
+        "actions": [f'"{PYTHON}" -m proofagent_harness.cli traps validate "{ROOT / "eval" / "traps"}" --strict'],
+        "uptodate": [False],
+    }
+
+
+def task_eval_dry_run():
+    """ProofAgent wiring check: mock catalog, 2 scenarios, 3 turns, no upload (needs the LLM keys)."""
+    return {
+        "actions": [f'"{PYTHON}" -m eval.run --dry-run'],
+        "uptodate": [False],
+    }
+
+
+def task_eval():
+    """Full ProofAgent evaluation on the real index; uploads to the dashboard (EVAL_AGENT_VERSION=v1 ...)."""
+    return {
+        "actions": [f'"{PYTHON}" -m eval.run'],
+        "file_dep": [CHROMA_DIR / "chroma.sqlite3"],
         "uptodate": [False],
     }

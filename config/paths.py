@@ -37,3 +37,10 @@ RAG_EVAL_DIR = DATA_DIR / "eval"  # retrieval evaluation output (rag/eval)
 LOGS_DIR = DATA_DIR / "logs"  # tool-call logs (MCP), read for the ProofAgent failure analysis
 TOOL_CALLS_LOG = LOGS_DIR / "tool_calls.jsonl"  # one JSON line per MCP tool call (request + response)
 AUDIO_DIR = DATA_DIR / "audio"  # recordings and TTS output (Voice & UI)
+
+# ProofAgent evaluation (Beste, eval/): generated harness inputs and run output
+PROOFAGENT_DIR = DATA_DIR / "proofagent"
+EVAL_CONTEXT_DIR = PROOFAGENT_DIR / "context"  # system_prompt.md, tools.json, agent.yaml (built from prompts/, contracts/)
+EVAL_KNOWLEDGE_DIR = PROOFAGENT_DIR / "knowledge"  # catalog the agent is grounded on, for hallucination scoring
+EVAL_REPORTS_DIR = PROOFAGENT_DIR / "reports"  # report JSON / Markdown per run
+EVAL_TURNS_DIR = PROOFAGENT_DIR / "turns"  # one JSONL per run: every turn's message and final AgentState

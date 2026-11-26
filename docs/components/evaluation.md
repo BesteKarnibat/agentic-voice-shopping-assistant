@@ -61,62 +61,76 @@ Each failed scenario is assigned to the first stage that went wrong, using `step
 
 ## 2. ProofAgent setup
 
-**Decision pending (#39), proposal:** ProofAgent calls `run_agent` directly through a Python adapter with the
-transcript text. Voice is tested with the audio fixtures above.
+ProofAgent drives the agent with **transcript text** through a Python adapter (#39). Voice is tested with the
+audio fixtures above.
 
-- **Adapter** (`eval/agent.py`, #55): exposes `agent(message: str) -> AgentResponse`. It keeps a session per
-  conversation, calls `run_agent(message, session_id)`, returns `final_answer` as `text`, and fills
-  `tools_called` from the `step_log` entries of the Retriever so Tool Use is scored on real calls.
-- **Agent context** (`--context-dir eval/context/`): the system prompts from `prompts/` and the tool schemas from
-  `contracts/tool_schemas.json`, so the jury knows the rules the agent was given.
-- **Domain knowledge** (`--domain-knowledge-dir eval/knowledge/`): the sample of catalog products used in the
-  run, so fabricated product facts can be detected.
-- **Custom scenarios** (`--extra-traps eval/traps/`): the files below, one per scenario group, in ProofAgent's
-  trap format (YAML frontmatter + `# Pattern` + `# Scenario` blocks + pass/fail criteria).
-- **Judge model:** a different provider from the agent's LLM, so the agent does not grade itself. Set with
-  `PROOFAGENT_LLM`.
-- **Fault injection** (for `toy_incorrect_tool_results`): an adapter flag that swaps MCP results for prepared
-  bad results (wrong product, over-budget item, injected review text).
-- **Repeatability:** fixed `--seed`, same catalog sample, and the commit hash recorded with each run.
-- **Dashboard upload:** the harness runs locally; `--upload` sends each run's scorecard and evidence to the team's
-  workspace on [app.proofagent.ai](https://app.proofagent.ai) (Agent testing → Evaluations). It needs an
-  **evaluation key** (API keys → "Create evaluation key") in `.env` as `PROOFAGENT_API_KEY`. The base URL
-  `https://app.proofagent.ai` is configuration, not a secret. The upload also returns a pass / review / block
-  decision.
+### How to run
+
+```bash
+uv run doit eval_validate     # check eval/traps/ against the trap schema
+uv run doit eval_dry_run      # wiring check: mock catalog, 2 scenarios, 3 turns, no upload (~2 min)
+EVAL_AGENT_VERSION=v1 uv run doit eval    # full run on the real index, uploads to the dashboard
+```
+
+`eval/run.py` rebuilds the context (`eval/build_context.py`), then calls `proof run` with the settings in
+`config/eval.py` (env vars override: `EVAL_TURNS`, `EVAL_AGENT_VERSION`, `EVAL_JURY_LLM`, `EVAL_CATALOG`, ...).
+
+### Pieces
+
+| Piece | File | What it does |
+|-------|------|--------------|
+| Adapter | `eval/agent.py` | `agent(message) -> AgentResponse`: runs `run_agent()`, returns `final_answer` as `text`, the Retriever's MCP calls as `tools_called`, catalog and live results as `retrievals`, and intent / safety / Critic verdict as `memory_snapshot`. Exposes `agent.reset()`. |
+| Agent context | `data/proofagent/context/` (built) | `system_prompt.md` (every node prompt from `prompts/`), `tools.json` (from `contracts/tool_schemas.py`), `agent.yaml` (role, goal, business case, from `eval/agent.yaml`). |
+| Domain knowledge | `data/proofagent/knowledge/catalog.md` (built) | The catalog the agent is grounded on (`products.parquet`, or the mock catalog), for hallucination scoring. |
+| Scenarios | `eval/traps/` | Our 10 scenario files, pinned with `--pin-traps` so every run includes them; the remaining turns come from ProofAgent's library. |
+| Turn log | `data/proofagent/turns/<run>.jsonl` | Every turn's message, the transcript sent, and the full final `AgentState`, for the deterministic checks in 1.2. |
+| Reports | `data/proofagent/reports/<run>.json` / `.md` | The scorecard and evidence for each run. |
+
+### Multi-turn memory
+
+ProofAgent runs one continuous conversation and calls `agent(message)` once per turn. `run_agent()` handles one
+turn, so the adapter adds the last `EVAL_HISTORY_TURNS` (default 2) **shopping** turns to the transcript ("Earlier in
+this conversation: ... Current request: ..."), with the products recommended for them. Refused, emergency, and
+out-of-scope turns are not carried forward: in the first dry run they were, and the Router kept answering every
+later turn with the emergency template. This stays in the adapter until the graph keeps memory per `session_id`.
+
+### Models
+
+| Role | Default | Why |
+|------|---------|-----|
+| Agent | `config/llm.py` (OpenAI `gpt-4o-mini`) | Team default |
+| Attacker (writes the adversarial turns) | `gpt-4o-mini` | Cheap; different role from the jury |
+| Jury | `anthropic/claude-haiku-5-5` | Different provider from the agent, so it is not grading itself |
+| Jury fallback | `gpt-4.1-mini` | Used (with a warning) when `.env` has no `ANTHROPIC_API_KEY`; noted as a limitation |
+
+### Dashboard upload
+
+`--upload` sends each run's scorecard and evidence to the team's workspace on
+[app.proofagent.ai](https://app.proofagent.ai) (Agent testing → Evaluations), with `--agent toy-shopping-assistant`,
+`--agent-version`, `--profile default_multi_turn`, and `--fail-on block`. Bump `EVAL_AGENT_VERSION` for each run we
+compare (v1 = first run Sat Nov 28, v2 = after the fix loop) so the dashboard shows both scorecards side by side.
 
 | Setting | Where | Value |
 |---------|-------|-------|
 | `PROOFAGENT_API_KEY` | `.env` (secret) | Workspace key; works for evaluation uploads and the Nano guardrail scan |
-| `PROOFAGENT_API_BASE_URL` | config | `https://app.proofagent.ai` |
-| Judge model (`PROOFAGENT_LLM`) | config | A different provider from the agent's LLM; uses that provider's key from `.env` |
+| `PROOFAGENT_API_BASE_URL` | `config/eval.py` | `https://app.proofagent.ai` |
 
 The ProofAgent **Guardrail** product (Nano scanner, Guardrail MCP) is separate from evaluation. It scans single
 messages for prompt injection and personal data. It could be added later as an extra check on `web.search`
 snippets and reviews; it does not replace `prompts/guardrails.md`, which holds the toy-specific rules.
 
-```bash
-# Draft; final command lands with #55 as a doit task
-uv run proof run eval/agent.py \
-  --context-dir eval/context \
-  --domain-knowledge-dir eval/knowledge \
-  --extra-traps eval/traps \
-  --traps <comma-separated scenario names> \
-  --turns 6 --seed 42 \
-  --json data/eval/report.json \
-  --agent "toy-shopping-assistant" --agent-version v1 \
-  --profile default_multi_turn \
-  --upload --fail-on block
-```
+### Not done yet
 
-`--agent-version` is bumped for each run we compare (v1 = first run Sat Nov 28, v2 = after the fix loop), so the
-dashboard shows the two scorecards side by side. `--fail-on block` makes the command exit non-zero only on a
-"block" decision.
+- **Fault injection** for `toy_incorrect_tool_results` (S17–S19): an adapter switch that swaps MCP results for
+  prepared bad results. Planned with the adversarial scenarios (#54).
+- Tool names in the scenarios are `rag.search` and `web.search`, as the Retriever calls them (`config/graph.py`).
 
-Tool names in the scenarios are `rag.search` and `web.search`, as the Retriever calls them (`config/graph.py`).
+### Dry run (Wed Nov 25, mock catalog, 3 turns, jury `gpt-4.1-mini`)
 
-**Multi-turn note:** `run_agent(transcript, *, session_id=...)` runs one user turn. Several scenarios have 2–3 turns,
-so the adapter has to carry earlier turns (constraints, last results) into the next call, or the graph has to keep
-conversation memory per `session_id`. To agree with Devanshu before #55.
+The wiring works end to end: both pinned scenarios ran, plus one library PII trap. Hallucination Resistance,
+Safety and Tool Use 100%, Instruction Following 90%, Manipulation Resistance 69%; Task Success not measured (too
+few turns), so the run is marked INCOMPLETE. These numbers only check the wiring; the real results come from
+the full run.
 
 ## 3. Scenarios
 
