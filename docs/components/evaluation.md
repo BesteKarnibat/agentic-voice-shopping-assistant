@@ -69,8 +69,15 @@ audio fixtures above.
 ```bash
 uv run doit eval_validate     # check eval/traps/ against the trap schema
 uv run doit eval_dry_run      # wiring check: mock catalog, 2 scenarios, 3 turns, no upload (~2 min)
-EVAL_AGENT_VERSION=v1 uv run doit eval    # full run on the real index, uploads to the dashboard
+EVAL_AGENT_VERSION=v2 uv run doit eval    # full run on the real index (30 turns), uploads to the dashboard
+uv run doit eval_faults       # incorrect tool results via fault injection
+uv run python -m eval.upload_report data/proofagent/reports/20261126T035151-v1b.json --agent-version v1b
 ```
+
+The last command is only needed when a run ends with "Not uploaded: no evidence record could be built": a
+proofagent-harness 0.14.0 bug rejects the error label it records when a judge call falls back
+(`LLMError`). `eval/upload_report.py` normalizes that label in a copy of the report and uploads it through the
+harness's own upload path.
 
 `eval/run.py` rebuilds the context (`eval/build_context.py`), then calls `proof run` with the settings in
 `config/eval.py` (env vars override: `EVAL_TURNS`, `EVAL_AGENT_VERSION`, `EVAL_JURY_LLM`, `EVAL_CATALOG`, ...).
@@ -81,8 +88,8 @@ EVAL_AGENT_VERSION=v1 uv run doit eval    # full run on the real index, uploads 
 |-------|------|--------------|
 | Adapter | `eval/agent.py` | `agent(message) -> AgentResponse`: runs `run_agent()`, returns `final_answer` as `text`, the Retriever's MCP calls as `tools_called`, catalog and live results as `retrievals`, and intent / safety / Critic verdict as `memory_snapshot`. Exposes `agent.reset()`. |
 | Agent context | `data/proofagent/context/` (built) | `system_prompt.md` (every node prompt from `prompts/`), `tools.json` (from `contracts/tool_schemas.py`), `agent.yaml` (role, goal, business case, from `eval/agent.yaml`). |
-| Domain knowledge | `data/proofagent/knowledge/catalog.md` (built) | The catalog the agent is grounded on (`products.parquet`, or the mock catalog), for hallucination scoring. |
-| Scenarios | `eval/traps/` | Our 10 scenario files, pinned with `--pin-traps` so every run includes them; the remaining turns come from ProofAgent's library. |
+| Domain knowledge | `data/proofagent/knowledge/catalog.md` (built) | What the catalog contains (size, and how often each field is present: ratings 0%, warnings 1%, ages 74%) plus a 100-product sample, about 54k characters. The judges also see each turn's retrieved products. The full catalog (3.6M characters) blew the judges' rate limit in v1. |
+| Scenarios | `eval/traps/` | Our 14 scenario files, pinned with `--pin-traps` so every run includes them; the remaining turns come from ProofAgent's library. |
 | Turn log | `data/proofagent/turns/<run>.jsonl` | Every turn's message, the transcript sent, and the full final `AgentState`, for the deterministic checks in 1.2. |
 | Reports | `data/proofagent/reports/<run>.json` / `.md` | The scorecard and evidence for each run. |
 
@@ -90,7 +97,8 @@ EVAL_AGENT_VERSION=v1 uv run doit eval    # full run on the real index, uploads 
 
 ProofAgent runs one continuous conversation and calls `agent(message)` once per turn. `run_agent()` handles one
 turn, so the adapter adds the last `EVAL_HISTORY_TURNS` (default 2) **shopping** turns to the transcript ("Earlier in
-this conversation: ... Current request: ..."), with the products recommended for them. Refused, emergency, and
+this conversation: ... New message: ..."), with the products recommended for them. (Not "Current request": the word
+"current" is one of the Router's live-price triggers, and in v1 it sent every turn with history to `web.search`.) Refused, emergency, and
 out-of-scope turns are not carried forward: in the first dry run they were, and the Router kept answering every
 later turn with the emergency template. This stays in the adapter until the graph keeps memory per `session_id`.
 
@@ -100,8 +108,9 @@ later turn with the emergency template. This stays in the adapter until the grap
 |------|---------|-----|
 | Agent | `config/llm.py` (OpenAI `gpt-4o-mini`) | Team default |
 | Attacker (writes the adversarial turns) | `gpt-4o-mini` | Cheap; different role from the jury |
-| Jury | `anthropic/claude-haiku-5-5` | Different provider from the agent, so it is not grading itself |
-| Jury fallback | `gpt-4.1-mini` | Used (with a warning) when `.env` has no `ANTHROPIC_API_KEY`; noted as a limitation |
+| Jury | `anthropic/claude-sonnet-5-5` | Different provider from the agent, so it is not grading itself; a stronger model for more reliable verdicts |
+| Backup judge (`--fallback-llm`) | `gpt-4.1-mini` | Rescues judge calls that fail (rate limit, bad JSON); different family from the jury |
+| Jury without an Anthropic key | `gpt-4.1-mini` | Used (with a warning) when `.env` has no `ANTHROPIC_API_KEY`; noted as a limitation |
 
 ### Dashboard upload
 
@@ -236,7 +245,32 @@ a candidate for the failure analysis (#66).
 
 ## 4. Results
 <!-- Scorecard table with real numbers and the run date/commit. -->
-TODO (first run Sat Nov 28, #57; final run Sun Nov 29, #65)
+### v1b baseline (Wed Nov 25, real catalog, 30 turns, jury Claude Sonnet 5.5)
+
+Dashboard: [v1b](https://app.proofagent.ai/evaluations/3246f4a4-a647-4e94-b51a-ca077892a913) · report
+`data/proofagent/reports/20261126T035151-v1b.json` · failure report: [eval-v1b-failure-report.md](../eval-v1b-failure-report.md)
+
+| Metric | v1 (Haiku jury, broken settings) | **v1b** |
+|--------|-------------------|---------|
+| Task Success | 42% | **57%** (fail) |
+| Hallucination Resistance | 100% | **100%** |
+| Safety | 100% | **100%** |
+| Instruction Following | 100% | **100%** |
+| Manipulation Resistance | 100% | **100%** |
+| Tool Use | 100% | **100%** |
+| Failed judge calls | 36 | **0** |
+| Our scenario files used | 13 / 14 | **14 / 14** |
+
+v1 is kept for the record only: it ran with the full catalog as judge knowledge (36 judge calls lost to rate limits),
+an adapter label that triggered `web.search` on every turn with history, and no Serper key.
+
+**Dashboard vs local scorecard.** The uploaded record shows lower behaviour scores (Safety 35%, Instruction
+Following 20%, Manipulation Resistance 40%) and a BLOCK decision, while reporting 0 failed checks for those metrics
+(e.g. "0 of 134 checks failed" for safety). The evidence-record format refused the system prompt (its personal-data
+rule tripped on the test personas' names), so the context axis is withheld and the record's behaviour scores are not
+comparable to the jury's. We report the local scorecard and keep the dashboard link as the evidence trail.
+
+Final run (v2, after the fix loop): TODO (Sun Nov 29, #65).
 
 ## 5. Failure analysis
 <!-- Top failures, root cause, fix applied or why not fixed. -->

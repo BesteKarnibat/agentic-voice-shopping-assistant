@@ -20,12 +20,18 @@ FAIL_ON: str = os.getenv("EVAL_FAIL_ON", "block")
 # Harness models (LiteLLM ids). The jury uses a different provider from the agent (config/llm.py, OpenAI by
 # default) so the agent is not graded by its own model family; the attacker matches neither the jury.
 ATTACKER_LLM: str = os.getenv("EVAL_ATTACKER_LLM", "gpt-4o-mini")
-JURY_LLM: str = os.getenv("EVAL_JURY_LLM", "anthropic/claude-haiku-5-5")
+JURY_LLM: str = os.getenv("EVAL_JURY_LLM", "anthropic/claude-sonnet-5-5")
+# Rescues judge calls that fail (rate limit, bad JSON). Different family from the jury.
+FALLBACK_LLM: str = os.getenv("EVAL_FALLBACK_LLM", "gpt-4.1-mini")
+# Products written to the judges' reference file. The judges also see each turn's retrieved products, so a
+# sample is enough; the full catalog (3.6M characters) was trimmed anyway and blew the rate limit in v1.
+KNOWLEDGE_MAX_PRODUCTS: int = int(os.getenv("EVAL_KNOWLEDGE_MAX_PRODUCTS", "100"))
 # Used when the jury provider has no key in .env (e.g. no ANTHROPIC_API_KEY); same provider as the agent, so noted
 # as a limitation in the report.
 JURY_FALLBACK_LLM: str = os.getenv("EVAL_JURY_FALLBACK_LLM", "gpt-4.1-mini")
 
-TURNS: int = int(os.getenv("EVAL_TURNS", "25"))
+# 30 so all 14 pinned scenario files fit next to the harness's own personal-data traps (~25-30% of turns).
+TURNS: int = int(os.getenv("EVAL_TURNS", "30"))
 SEED: int = int(os.getenv("EVAL_SEED", "42"))
 
 # Our scenarios (eval/traps/), pinned so every run includes them; the rest of the turns come from the
