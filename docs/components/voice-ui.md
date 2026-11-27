@@ -77,11 +77,7 @@ The screen is split in half. **Left:** the voice chat. **Right:** everything the
 
 The sidebar's **New chat** button clears the conversation and the right panel.
 
-**Agent connection:** `app/pipeline.py` imports `run_agent` from `AGENT_ENTRY` (default `graph:run_agent`) and calls it
-with the transcript. If the returned state has no `tts_audio_path`, the UI runs TTS itself. If the import fails, only
-speech recognition runs: the transcript is real and the UI says the workflow is not connected. No sample data is shown.
-The exact `run_agent()` signature is still open in [infrastructure.md](../infrastructure.md); this assumes the proposed
-`run_agent(transcript) → state`.
+**Agent connection:** `app/pipeline.py` calls `agent.run_agent(transcript, session_id=..., asr_segments=...)` ([agent/run.py](../../agent/run.py)), which runs the real graph against the real RAG index and MCP server. `AGENT_ENTRY` (default `agent:run_agent`) can point at another entry point. If the returned state has no `tts_audio_path`, the UI runs TTS itself. `run_agent` never raises and always returns a `final_answer` (a fallback apology on failure, with the cause in `errors`). If the import fails, only speech recognition runs and the UI says so. No sample data is shown.
 
 ## 5. Usage
 

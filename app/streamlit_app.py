@@ -190,7 +190,7 @@ def render_assistant(m: dict) -> None:
         if audio:
             st.audio(audio, autoplay=m.pop("autoplay", False))  # autoplay once, not on reruns
     elif m.get("mode") == "asr_only":
-        st.info("The agent workflow isn't connected yet (set AGENT_ENTRY to run_agent), so I could only "
+        st.info("The agent workflow isn't connected yet (check that `agent.run_agent` imports), so I could only "
                 "transcribe what you said.")
     elif not state.get("errors"):
         st.markdown("I couldn't produce an answer for that.")

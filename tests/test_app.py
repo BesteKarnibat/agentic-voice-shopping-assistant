@@ -66,15 +66,15 @@ def test_without_agent_only_asr_runs(monkeypatch):
 def test_run_agent_called_with_transcript_then_tts(tmp_path):
     seen = []
 
-    def run_agent(transcript):
-        seen.append(transcript)
+    def run_agent(transcript, **kw):
+        seen.append((transcript, kw["session_id"]))
         return {"transcript": "overwritten?", "final_answer": "Pick A [1].", "spoken_summary": "Pick A.",
                 "step_log": [{"timestamp": "", "node": "router", "summary": "ok", "details": {}}]}
 
     tts = FakeTTS()
     state, mode = run_turn(text="board game under $30", agent=run_agent,
                            tts_node=make_tts_node(tts, str(tmp_path)))
-    assert mode == "agent" and seen == ["board game under $30"]
+    assert mode == "agent" and [t for t, _ in seen] == ["board game under $30"] and seen[0][1] == state["session_id"]
     assert state["transcript"] == "board game under $30"  # ASR transcript kept
     assert [e["node"] for e in state["step_log"]] == ["asr", "router", "tts"]
     assert tts.spoken == ["Pick A."] and state["tts_audio_path"].endswith(".mp3")
@@ -82,13 +82,13 @@ def test_run_agent_called_with_transcript_then_tts(tmp_path):
 
 def test_clarification_is_spoken(tmp_path):
     tts = FakeTTS()
-    state, _ = run_turn(text="I need a toy", agent=lambda t: {"clarification_question": "How old is the child?"},
+    state, _ = run_turn(text="I need a toy", agent=lambda t, **kw: {"clarification_question": "How old is the child?"},
                         tts_node=make_tts_node(tts, str(tmp_path)))
     assert tts.spoken == ["How old is the child?"] and state["tts_audio_path"]
 
 
 def test_agent_exception_is_reported():
-    def boom(t):
+    def boom(t, **kw):
         raise RuntimeError("graph down")
 
     state, mode = run_turn(text="hi", agent=boom)

@@ -1,10 +1,11 @@
 """Runs one voice turn: ASR -> run_agent(transcript) -> TTS, and returns the final AgentState.
 
-The UI owns the voice steps; the LangGraph workflow is reached only through Devanshu's entry point
-`run_agent(transcript) -> state` (docs_assignment/task-planning.md, handoff 5). Set
-AGENT_ENTRY="package.module:function" to point at it (default "graph:run_agent").
+The UI owns the voice steps; the LangGraph workflow is reached only through the entry point
+`agent.run_agent(transcript, session_id=..., asr_segments=...) -> state` (agent/run.py), which never
+raises and always returns a state with a final_answer. Set AGENT_ENTRY="package.module:function" to
+point at a different one (default "agent:run_agent").
 
-Until run_agent exists, only ASR runs: the transcript is real and no answer is produced.
+If the entry point can't be imported, only ASR runs: the transcript is real and no answer is produced.
 No sample data is ever shown.
 """
 from __future__ import annotations
@@ -17,11 +18,11 @@ from typing import Callable, Optional
 from asr.node import make_asr_node
 from tts.node import make_tts_node
 
-AGENT_ENTRY = os.getenv("AGENT_ENTRY", "graph:run_agent")
+AGENT_ENTRY = os.getenv("AGENT_ENTRY", "agent:run_agent")
 
 
 def load_agent() -> Optional[Callable]:
-    """Return run_agent(transcript) -> state, or None if it can't be imported yet."""
+    """Return the run_agent callable, or None if it can't be imported."""
     mod_name, _, fn_name = AGENT_ENTRY.partition(":")
     try:
         return getattr(importlib.import_module(mod_name), fn_name)
@@ -64,7 +65,8 @@ def run_turn(audio_path: Optional[str] = None, text: Optional[str] = None,
 
     # 2. LangGraph workflow
     try:
-        result = agent(state["transcript"]) or {}
+        result = agent(state["transcript"], session_id=state["session_id"],
+                       asr_segments=state.get("asr_segments") or []) or {}
     except Exception as e:  # show the failure in the chat instead of crashing the page
         return _merge(state, {"errors": [f"agent: {type(e).__name__}: {e}"]}), "agent"
     # Keep our ASR fields and step-log entry; take everything else from the agent's state.
