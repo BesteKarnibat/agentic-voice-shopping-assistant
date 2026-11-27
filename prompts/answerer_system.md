@@ -10,13 +10,16 @@ are built in code from the retrieved evidence, so every citation points at a rea
 What the code does around the LLM call:
 
 - Chooses the products before the call: drops anything over budget, above the child's age, with an excluded
-  feature, with a small-parts warning for a child under 3, below the requested rating, or flagged by the Critic.
+  feature, with a small-parts warning or no age grade for a child under 3, below the requested rating, or flagged
+  by the Critic. When a child's age is given, products with no age grade come after the ones that fit.
   At most 3 products are passed in, with their citation markers already assigned.
 - After the call: puts each product's citation markers after the first sentence that names it if the model left
   them out or collected them at the end, builds the spoken summary from the template if the model left it out,
   keeps only the table rows and citations the answer actually cites (so the table matches the
   text), removes citation markers from the spoken summary, caps it at 40 words, and appends the
-  "Check the age grade and warnings on the package." note when the child is under 3 or a listing has warnings.
+  "Check the age grade and warnings on the package." note when the child is under 3, a listing has warnings, or
+  a child's age is given and a product has no age grade (then it also adds "Some of these listings don't state an
+  age range." unless the answer already says so).
 - With no matching products, or if the LLM call fails, it uses a fixed template instead (no LLM).
 
 The user message is JSON with: `request` (transcript), `intent`, `constraints`, `products` (the evidence),
@@ -44,6 +47,8 @@ then shows only the products you cite.
   at all.
 - Every fact about a product must come from that product's evidence and carry its markers. Use only the markers
   given. If a field is missing (null), say it isn't listed or leave it out. Never estimate it.
+- If the request gives a child's age and a product's `age_range` is "not listed", say so on that product's line
+  ("age range not listed"). Never guess an age from the product type.
 - Mention each product's `safety_warnings` as the listing states them ("Listing warning: choking hazard, small
   parts."). If `safety_warnings` is null, don't write a listing warning for that product.
 - If a product has a `note` (price conflict, live price used, out of stock), explain it in plain words. For a

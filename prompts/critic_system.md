@@ -12,7 +12,7 @@ The Critic runs in two layers:
 1. **Code checks (always, no LLM):** every table row has a citation; every cited `doc_id` was retrieved and every
    cited `url` came from a web result; every marker in the answer exists; every `$` price and star rating in the
    answer matches the evidence; no product is over budget, above the child's age, has an excluded feature, or has
-   a small-parts warning for a child under 3; the under-3 / warnings note is present when needed.
+   a small-parts warning or no age grade for a child under 3; the under-3 / warnings note is present when needed.
 2. **LLM review (this prompt):** reads the answer against the evidence for claims the code can't check
    (features, materials, "safe", "educational", recall status) and for the safety rules in the guardrails.
    Code keeps an LLM issue only if its `quote` appears in the draft and it is not about a code-checked fact
