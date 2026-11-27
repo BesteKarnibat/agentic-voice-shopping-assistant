@@ -403,7 +403,7 @@ class ImportFromAnywhereTests(unittest.TestCase):
         code = ("from rag.search import rag_search; from contracts.tool_schemas import RagSearchInput; "
                 "o = rag_search(RagSearchInput(query='puzzle', top_k=2)); print(len(o.results))")
         with tempfile.TemporaryDirectory() as tmp:
-            r = subprocess.run([sys.executable, "-c", code], cwd=tmp, capture_output=True, text=True, timeout=300)
+            r = subprocess.run([sys.executable, "-c", code], cwd=tmp, capture_output=True, text=True, encoding="utf-8", timeout=300)
         self.assertEqual(r.returncode, 0, r.stderr[-800:])
         self.assertEqual(r.stdout.strip().splitlines()[-1], "2")
 

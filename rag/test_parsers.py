@@ -43,6 +43,12 @@ class AgeTests(unittest.TestCase):
         self.assertEqual(age_bounds("18 months and up", ""), (1.5, None, "structured"))
         self.assertEqual(age_bounds("1-18 months", ""), (0.08, 1.5, "structured"))
 
+    def test_text_ages_n_plus_overrides_range_ending_at_n(self):
+        # Goosebumps game: source says '3 months-8 years', listing says 'Ages 8+'
+        self.assertEqual(age_bounds("3 months-8 years", "Game (Ages 8+) for 2-6 players"), (8.0, None, "text"))
+        self.assertEqual(age_bounds("3 months-8 years", "no age in text"), (0.25, 8.0, "structured"))
+        self.assertEqual(age_bounds("4-12 years", "Ages 8+"), (4.0, 12.0, "structured"))
+
     def test_corrupt_range_keeps_minimum_only(self):
         self.assertEqual(age_bounds("14-1 years", ""), (14.0, None, "structured"))
         self.assertEqual(age_bounds("36 months-1 years", ""), (3.0, None, "structured"))
