@@ -36,6 +36,14 @@ CURRENT_INFO_KEYWORDS: tuple[str, ...] = (
     "availability", "price now", "current price", "still available", "on sale", "deal",
 )
 
+# Backup for the Router (#57): a request with one of these words is shopping, even if it is wrapped in urgency
+# or tool names. Matched as whole words; plurals included.
+SHOPPING_WORDS: tuple[str, ...] = (
+    "toy", "game", "puzzle", "lego", "doll", "drone", "blocks", "building set", "playset", "plush",
+    "stuffed animal", "action figure", "science kit", "chemistry set", "craft kit", "stem kit", "nerf",
+    "board game", "card game", "rc car", "train set", "kite", "jigsaw",
+)
+
 # Reconciliation
 PRICE_CONFLICT_THRESHOLD: float = _env_float("PRICE_CONFLICT_THRESHOLD", 0.10)
 TITLE_MATCH_THRESHOLD: float = _env_float("TITLE_MATCH_THRESHOLD", 0.6)

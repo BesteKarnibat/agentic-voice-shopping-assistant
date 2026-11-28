@@ -5,19 +5,38 @@ Prompts: system.md + router_system.md + guardrails.md.
 
 from __future__ import annotations
 
+import re
+
 from agent.llm import invoke_structured
 from agent.prompts import prompt_section, system_prompt_for
-from agent.schemas import RouterDecision
-from config.graph import CURRENT_INFO_KEYWORDS
+from agent.schemas import SAFE_CATEGORIES, UNSAFE_CATEGORIES, RouterDecision
+from config.graph import CURRENT_INFO_KEYWORDS, SHOPPING_WORDS
 from contracts.state import AgentState, log_step
 
 DEFAULT_CLARIFICATION = "Happy to help! Who is the toy or game for, how old are they, and what's your budget?"
 EMPTY_TRANSCRIPT_QUESTION = "Sorry, I didn't catch that. What kind of toy or game are you looking for?"
+SHOPPING_RE = re.compile(r"\b(" + "|".join(re.escape(w) for w in SHOPPING_WORDS) + r")s?\b", re.I)
 
 
 def _normalize(decision: RouterDecision, transcript: str) -> dict:
     intent = decision.intent
     safety = dict(decision.safety)
+    category = safety.get("category")
+    shopping = bool(SHOPPING_RE.search(transcript))
+
+    # #57: child_safety / unsupported_claim are answered (age and claims handled downstream), never refused.
+    if category in SAFE_CATEGORIES:
+        safety["is_safe"] = True
+        if intent in ("unsafe", "out_of_scope", "unclear"):
+            intent = "product_search"
+    # #57: urgency or tool names around a toy request; an injection with a real request left is answered.
+    if shopping and category not in UNSAFE_CATEGORIES:
+        if category == "prompt_injection" and (not safety.get("is_safe", True) or intent == "unsafe"):
+            safety["is_safe"] = True
+            intent = "product_search"
+        elif intent in ("out_of_scope", "unclear"):
+            intent = "product_search"
+
     c = {k: v for k, v in dict(decision.constraints).items() if v is not None}
     c["preferences"] = list(c.get("preferences") or [])
     c["exclude_features"] = list(c.get("exclude_features") or [])

@@ -11,21 +11,29 @@ from pydantic import BaseModel, Field, field_validator
 
 from contracts.state import Constraints, Intent, SafetyCheck
 
+# guardrails.md: only these categories are unsafe on their own; child_safety and unsupported_claim are answered.
+UNSAFE_CATEGORIES = frozenset({"injury_emergency", "harmful_use", "minor_exploitation"})
+SAFE_CATEGORIES = frozenset({"child_safety", "unsupported_claim"})
+
 
 class RouterDecision(BaseModel):
     """Router output → AgentState.intent / constraints / safety / clarification_question."""
 
     intent: Intent = Field(..., description="'unclear' only if there is no product type, brand, or age at all.")
     constraints: Constraints = Field(..., description="Only what the user said; null/empty when not stated.")
-    safety: SafetyCheck
+    safety: SafetyCheck = Field(default_factory=lambda: {"is_safe": True, "category": None, "reason": None})
     clarification_question: Optional[str] = Field(None, description="Null unless intent is 'unclear'.")
 
     @field_validator("safety", mode="before")
     @classmethod
     def _fill_optional_safety_keys(cls, v):
-        # Models often omit null keys, but SafetyCheck requires them.
+        # Models often omit keys, but SafetyCheck requires them. A missing is_safe follows the category (#57).
+        if v is None:
+            v = {}
         if isinstance(v, dict):
             v = {"category": None, "reason": None, **v}
+            if v.get("is_safe") is None:
+                v["is_safe"] = v["category"] not in UNSAFE_CATEGORIES
         return v
 
     @field_validator("constraints", mode="before")
