@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import re
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, Field
 
@@ -27,6 +28,11 @@ SPOKEN_WARNING = "Please check the package warnings."
 AGE_NOT_LISTED = "age range not listed"
 AGE_NOTE = "Some of these listings don't state an age range."
 SMALL_PARTS_WORDS = ("small part", "choking")
+# Price labels, the same wording as the Reconcile notes: "catalog price (2020)" and "current price at <store>".
+CATALOG_LABEL = "catalog price (2020)"
+PRICE_NOTE = "These are 2020 catalog prices. Want me to check current ones?"
+PRICE_NOTE_NO_LIVE = "I couldn't find a current price for the ones marked catalog price (2020)."
+SPOKEN_PRICE_NOTE = "Prices are from our 2020 catalog."
 MARKER_RE = re.compile(r"\[\d+\]")
 
 
@@ -55,8 +61,30 @@ def limit_words(text: str, n: int) -> str:
     return text if len(words) <= n else " ".join(words[:n]).rstrip(",.;:") + "."
 
 
-def clean_spoken(text: str, needs_warning: bool) -> str:
+def price_label(row: ComparisonRow) -> str:
+    """'$12.15 catalog price (2020)', '$14.97 current price at walmart.com', or 'price not listed'."""
+    if row.get("price") is None:
+        return "price not listed"
+    if row.get("price_source") == "web":
+        store = urlsplit(row.get("live_url") or "").netloc.removeprefix("www.") or "the store"
+        return f"${row['price']:.2f} current price at {store}"
+    return f"${row['price']:.2f} {CATALOG_LABEL}"
+
+
+def price_note(state: AgentState, rows: list[ComparisonRow]) -> str | None:
+    """Closing line when any shown price comes from the 2020 catalog."""
+    if not any(r.get("price") is not None and r.get("price_source") == "catalog" for r in rows):
+        return None
+    asked_live = bool((state.get("constraints") or {}).get("wants_current_info"))
+    return PRICE_NOTE_NO_LIVE if asked_live else PRICE_NOTE
+
+
+def clean_spoken(text: str, needs_warning: bool, catalog_prices: bool = False) -> str:
     text = " ".join(MARKER_RE.sub("", text).split())
+    if catalog_prices and "$" in text and "2020" not in text:
+        budget = SPOKEN_SUMMARY_MAX_WORDS - len(SPOKEN_PRICE_NOTE.split()) - \
+            (len(SPOKEN_WARNING.split()) if needs_warning and "warning" not in text.lower() else 0)
+        text = limit_words(text, budget) + " " + SPOKEN_PRICE_NOTE
     if needs_warning and "warning" not in text.lower():
         budget = SPOKEN_SUMMARY_MAX_WORDS - len(SPOKEN_WARNING.split())
         return limit_words(text, budget) + " " + SPOKEN_WARNING
@@ -168,8 +196,7 @@ def template_answer(picks, rows, left_out, child_age=None) -> tuple[str, str]:
 
     lines = []
     for row, (r, p) in zip(rows, picks):
-        price = (f"${row['price']:.2f} ({row['price_source']})" if row["price"] is not None else "price not listed")
-        bits = [price]
+        bits = [price_label(row)]
         if p.get("rating") is not None:
             bits.append(f"{p['rating']} stars")
         if row["age_range"]:
@@ -191,6 +218,7 @@ def template_answer(picks, rows, left_out, child_age=None) -> tuple[str, str]:
     spoken = f"My top pick is {short_title(top['title'], 6)}"
     if top.get("chosen_price") is not None:
         spoken += f" at ${top['chosen_price']:.2f}"
+        spoken += " in our 2020 catalog" if top.get("price_source") == "catalog" else ""
     spoken += "."
     if top.get("price_conflict"):
         spoken += " Its live price differs from our catalog."
@@ -207,7 +235,7 @@ def evidence(picks, rows) -> list[dict]:
         out.append({
             "rank": row["rank"], "citation_markers": row["citation_markers"],
             "title": r["title"], "brand": r.get("brand"),
-            "price": r.get("chosen_price"), "price_source": r.get("price_source"),
+            "price": r.get("chosen_price"), "price_source": r.get("price_source"), "price_label": price_label(row),
             "catalog_price": r.get("catalog_price"), "live_price": r.get("live_price"),
             "availability": r.get("availability"), "rating": p.get("rating"),
             "age_range": row["age_range"] or "not listed", "safety_warnings": p.get("safety_warnings"),
@@ -343,7 +371,10 @@ def answerer_node(state: AgentState) -> dict:
         answer += "\n" + AGE_NOTE
     if warn and WARNING_NOTE.lower() not in answer.lower():
         answer += "\n" + WARNING_NOTE
-    spoken = clean_spoken(spoken, warn)
+    note = price_note(state, rows)
+    if note and note.lower() not in answer.lower():
+        answer += "\n" + note
+    spoken = clean_spoken(spoken, warn, catalog_prices=any(r.get("price_source") == "catalog" for r in rows))
 
     summary = f"{len(rows)} products, {len(citations)} citations ({source})"
     if revision:
