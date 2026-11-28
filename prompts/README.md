@@ -27,5 +27,7 @@ agent, or tool that uses it. This is worth 5 points and is graded on completenes
 | `answerer_system.md` | Answerer prompt (+ embeds `guardrails.md`); table and citations built in code | `answerer` | `draft_answer`, `final_answer`, `spoken_summary` (LLM); `comparison_table`, `citations` (code) | Beste | draft |
 | `critic_system.md` | Critic LLM review (+ embeds `guardrails.md`), on top of code checks | `critic` | `critic`, `revision_count` | Beste | draft |
 | `guardrails.md` | Guardrail instructions | `router` (input), `answerer`, `critic` (output) | `safety`, `critic.safety_issues` | Beste | draft |
+| `asr_initial_prompt.md` | Whisper decoding prompt (vocabulary bias, not an LLM prompt) | `asr` ([asr/transcriber.py](../asr/transcriber.py)) | `transcript`, `asr_segments` | Alekhya | done |
+| `tts_instructions.md` | Voice-style instructions for OpenAI `gpt-4o-mini-tts` | `tts` ([tts/synthesizer.py](../tts/synthesizer.py)) | `tts_audio_path` | Alekhya | done |
 
 Add rows for any other prompt, for example a separate spoken-summary prompt or a ProofAgent judge prompt.

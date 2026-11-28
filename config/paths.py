@@ -33,6 +33,9 @@ INDEX_DIR = DATA_DIR / "index"
 CHROMA_DIR = INDEX_DIR / "chroma"  # Chroma persistent store (collection "products")
 RAG_EVAL_DIR = DATA_DIR / "eval"  # retrieval evaluation output (rag/eval)
 
+# Prompts disclosed for grading (prompts/README.md); code loads them from here
+PROMPTS_DIR = ROOT / "prompts"
+
 # Runtime output
 LOGS_DIR = DATA_DIR / "logs"  # tool-call logs (MCP), read for the ProofAgent failure analysis
 TOOL_CALLS_LOG = LOGS_DIR / "tool_calls.jsonl"  # one JSON line per MCP tool call (request + response)
