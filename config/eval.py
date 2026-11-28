@@ -12,7 +12,7 @@ import os
 # ProofAgent workspace (dashboard) for --upload
 PROOFAGENT_API_BASE_URL: str = os.getenv("PROOFAGENT_API_BASE_URL", "https://app.proofagent.ai")
 AGENT_NAME: str = os.getenv("EVAL_AGENT_NAME", "toy-shopping-assistant")
-# Bump between runs we compare: v1 = first run (Sat Nov 28), v2 = after the fix loop.
+# Bump between runs we compare: v1c = baseline before the fix loop, v2 = after it.
 AGENT_VERSION: str = os.getenv("EVAL_AGENT_VERSION", "v0")
 PROFILE: str = os.getenv("EVAL_PROFILE", "default_multi_turn")
 FAIL_ON: str = os.getenv("EVAL_FAIL_ON", "block")
@@ -20,7 +20,10 @@ FAIL_ON: str = os.getenv("EVAL_FAIL_ON", "block")
 # Harness models (LiteLLM ids). The jury uses a different provider from the agent (config/llm.py, OpenAI by
 # default) so the agent is not graded by its own model family; the attacker matches neither the jury.
 ATTACKER_LLM: str = os.getenv("EVAL_ATTACKER_LLM", "gpt-4o-mini")
-JURY_LLM: str = os.getenv("EVAL_JURY_LLM", "anthropic/claude-sonnet-5-5")
+JURY_LLM: str = os.getenv("EVAL_JURY_LLM", "anthropic/claude-haiku-5-5")
+# Claude effort for the jury (low | medium | high | xhigh | max; "" = model default, which is medium on Haiku 5.5).
+# Sent as output_config.effort by eval/proof_cli.py; the harness's own --reasoning-effort only reaches OpenAI models.
+JURY_EFFORT: str = os.getenv("EVAL_JURY_EFFORT", "high")
 # Rescues judge calls that fail (rate limit, bad JSON). Different family from the jury.
 FALLBACK_LLM: str = os.getenv("EVAL_FALLBACK_LLM", "gpt-4.1-mini")
 # Products written to the judges' reference file. The judges also see each turn's retrieved products, so a

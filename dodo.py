@@ -149,10 +149,18 @@ def task_eval_dry_run():
     }
 
 
-def task_eval():
-    """Full ProofAgent evaluation on the real index; uploads to the dashboard (EVAL_AGENT_VERSION=v1 ...)."""
+def task_eval_checks():
+    """Deterministic checks (budget, age, citations, spoken length, ...) over the latest ProofAgent turn log."""
     return {
-        "actions": [f'"{PYTHON}" -m eval.run'],
+        "actions": [f'"{PYTHON}" -m eval.checks'],
+        "uptodate": [False],
+    }
+
+
+def task_eval():
+    """Full ProofAgent evaluation on the real index, then the deterministic checks (EVAL_AGENT_VERSION=v2 ...)."""
+    return {
+        "actions": [f'"{PYTHON}" -m eval.run', f'"{PYTHON}" -m eval.checks'],
         "file_dep": [CHROMA_DIR / "chroma.sqlite3"],
         "uptodate": [False],
     }

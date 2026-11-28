@@ -53,3 +53,16 @@ def test_adapter_returns_tools_retrievals_and_logs_turns(tmp_path, monkeypatch):
     mod.agent.reset()
     assert mod._history == []
     assert mod.compose_transcript("x", mod._history, 2) == "x"
+
+
+def test_jury_effort_only_for_claude_jury():
+    from eval.proof_cli import jury_kwargs
+    assert jury_kwargs("anthropic/claude-haiku-5-5", "high") == {"output_config": {"effort": "high"}}
+    assert jury_kwargs("gpt-4.1-mini", "high") == {}
+    assert jury_kwargs("anthropic/claude-haiku-5-5", "") == {}
+
+
+def test_run_uses_the_effort_wrapper():
+    from eval.run import build_command
+    cmd = build_command(dry_run=True, upload=False, turns=1, jury="anthropic/claude-haiku-5-5")
+    assert cmd[1:3] == ["-m", "eval.proof_cli"] and "anthropic/claude-haiku-5-5" in cmd

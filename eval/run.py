@@ -36,7 +36,7 @@ def build_command(dry_run: bool, upload: bool, turns: int | None, jury: str) -> 
     stamp = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%S}-{cfg.AGENT_VERSION}{'-dry' if dry_run else ''}"
     EVAL_REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     cmd = [
-        sys.executable, "-m", "proofagent_harness.cli", "run", str(ROOT / "eval" / "agent.py"),
+        sys.executable, "-m", "eval.proof_cli", "run", str(ROOT / "eval" / "agent.py"),
         "--context-dir", str(EVAL_CONTEXT_DIR),
         "--domain-knowledge-dir", str(EVAL_KNOWLEDGE_DIR),
         "--extra-traps", str(ROOT / "eval" / "traps"),
