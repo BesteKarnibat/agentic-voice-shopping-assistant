@@ -203,3 +203,87 @@ def test_llm_review_does_not_flag_saying_a_fact_is_unknown():
                                    "problem": "[1] states that the availability is unknown."}])
     unsupported, safety, dropped = filter_review(review, "Monopoly is $15.88, but its stock status is unknown. [1]", "")
     assert unsupported == [] and dropped[0]["why"].startswith("says information is missing")
+
+
+CHEM_NO_AGE = _product("d-chem", "Junior Chemistry Lab Kit", 24.99, 4.4, None, None, None, "20 experiments")
+CHEM_8 = _product("d-chem8", "Advanced Chemistry Set", 39.99, 4.6, 8, 99, ["adult supervision required"])
+
+
+def test_toddler_never_gets_a_product_with_no_age_grade():
+    # Devanshu's PR #94 case: a 2-year-old asking for the 8+ chemistry set.
+    s = _run(_state([CHEM_NO_AGE, CHEM_8], child_age_years=2))
+    assert s["comparison_table"] == []
+    assert "doesn't list an age range" in s["final_answer"] and "ages 8+" in s["final_answer"]
+
+
+def test_no_age_grade_goes_last_and_says_not_listed_for_older_child():
+    s = _run(_state([CHEM_NO_AGE, GAME], child_age_years=8))
+    assert [r["doc_id"] for r in s["comparison_table"]] == ["d-game", "d-chem"]
+    assert "age range not listed" in s["final_answer"]
+    assert WARNING_NOTE in s["final_answer"]
+
+
+def test_no_age_grade_is_fine_without_a_child_age():
+    s = _run(_state([CHEM_NO_AGE, GAME]))
+    assert [r["doc_id"] for r in s["comparison_table"]] == ["d-chem", "d-game"]
+    assert "not listed" not in s["final_answer"]
+
+
+def test_critic_flags_no_age_grade_for_toddler():
+    s = _state([CHEM_NO_AGE], child_age_years=2)
+    s.update({"comparison_table": [{"rank": 1, "title": CHEM_NO_AGE[1]["title"], "price": 24.99, "doc_id": "d-chem",
+                                    "citation_markers": ["[1]"]}],
+              "citations": [{"marker": "[1]", "source_type": "private", "doc_id": "d-chem", "url": None,
+                             "title": "x"}],
+              "final_answer": f"Junior Chemistry Lab Kit, $24.99 [1]. {WARNING_NOTE}"})
+    s.update(critic_node(s))
+    assert any("no age grade" in i for i in s["critic"]["safety_issues"])
+
+
+def test_markers_placed_when_llm_fixes_a_catalog_typo():
+    from agent.nodes.answerer import place_markers
+    rows = [{"title": "Small Wold Toys Ryan's Room - Sky High Stacking Blocks", "citation_markers": ["[1]"]},
+            {"title": "Mega Bloks Green Race Car Building Set", "citation_markers": ["[2]"]}]
+    text = ("Here are two sets.\nSmall World Toys Ryan's Room - Sky High Stacking Blocks, $22.98.\n"
+            "Mega Bloks Green Race Car, $3.99 [2]")
+    out, placed = place_markers(text, rows)
+    assert placed == 1 and "$22.98. [1]" in out and out.count("[2]") == 1
+
+
+def test_typo_fallback_never_cites_another_products_line():
+    from agent.nodes.answerer import place_markers
+    rows = [{"title": "LEGO Classic Medium Brick Box", "citation_markers": ["[1]"]}]
+    out, placed = place_markers("LEGO Classic Large Brick Box, $49.99 [2].", rows)
+    assert placed == 0 and "[1]" not in out
+
+
+def test_catalog_prices_are_labelled_2020_and_offer_a_live_check():
+    from agent.nodes.answerer import PRICE_NOTE
+    s = _run(_state([GAME]))
+    assert "$12.99 catalog price (2020)" in s["final_answer"]
+    assert s["final_answer"].rstrip().endswith(PRICE_NOTE)
+    assert "2020" in s["spoken_summary"]
+
+
+def test_live_price_labelled_with_store_and_no_2020_note():
+    rag, rec = _product("d-live", "Family Card Game Night Edition", 12.99, 4.7, 7)
+    rec = {**rec, "live_price": 15.49, "chosen_price": 15.49, "price_source": "web",
+           "live_url": "https://www.walmart.com/ip/family-card-game/123"}
+    s = _state([(rag, rec)], wants_current_info=True)
+    s["web_results"] = [{"url": rec["live_url"], "title": "x"}]
+    s = _run(s)
+    assert "$15.49 current price at walmart.com" in s["final_answer"]
+    assert "2020 catalog prices" not in s["final_answer"]
+
+
+def test_asked_for_current_price_but_only_catalog_found():
+    from agent.nodes.answerer import PRICE_NOTE_NO_LIVE
+    s = _run(_state([GAME], wants_current_info=True))
+    assert PRICE_NOTE_NO_LIVE in s["final_answer"] and "Want me to check current" not in s["final_answer"]
+
+
+def test_spoken_catalog_price_gets_the_year():
+    from agent.nodes.answerer import SPOKEN_PRICE_NOTE, clean_spoken
+    out = clean_spoken("My top pick is the card game at $12.99. Details are on screen.", False, catalog_prices=True)
+    assert out.endswith(SPOKEN_PRICE_NOTE) and len(out.split()) <= 40
+    assert clean_spoken("Top pick at $12.99 in our 2020 catalog.", False, catalog_prices=True).count("2020") == 1

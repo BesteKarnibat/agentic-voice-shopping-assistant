@@ -2,7 +2,7 @@
 
 Two layers feed one CriticVerdict:
 1. Code checks (always): citations, phantom sources, prices and ratings in the text, budget, age, excluded
-   features, small parts for under-3s, the warnings note.
+   features, small parts or no age grade for under-3s, the warnings note.
 2. LLM review (real providers, when there are products): unsupported claims and the guardrails output check.
 
 Any issue rejects the draft; `revision_count` goes up by one and `feedback` goes back to the Answerer. The graph
@@ -129,6 +129,8 @@ def code_checks(state: AgentState) -> dict[str, list[str]]:
             violations.append(f"Product {tag} is ${row['price']:.2f}, budget is ${budget:g}.")
         if age is not None and p.get("min_age_years") is not None and p["min_age_years"] > age:
             safety.append(f"Product {tag} is for ages {p['min_age_years']:g}+, but the child is {age:g}.")
+        if age is not None and age < 3 and p.get("min_age_years") is None:
+            safety.append(f"Product {tag} has no age grade, but the child is under 3.")
         if age is not None and age < 3 and any(w in warnings for w in SMALL_PARTS_WORDS):
             safety.append(f"Product {tag} has a small-parts warning, but the child is under 3.")
         text = warnings + " " + (p.get("features_snippet") or "").lower()

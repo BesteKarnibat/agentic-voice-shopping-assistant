@@ -30,10 +30,12 @@ from config.paths import (
 
 PYTHON = sys.executable  # the uv venv interpreter, since doit runs via `uv run doit`
 
-# Default chain (Devanshu): download → preprocess → index → app. Ends with the agent demo until
-# the app task lands.
+STREAMLIT_APP = ROOT / "app" / "streamlit_app.py"  # Alekhya's UI
+
+# Default chain (Devanshu): download → preprocess → index → app (agent_demo until the UI is merged).
 DOIT_CONFIG = {
-    "default_tasks": ["download_kaggle_dataset", "preprocess", "index", "agent_demo"],
+    "default_tasks": ["download_kaggle_dataset", "preprocess", "index",
+                      "app" if STREAMLIT_APP.exists() else "agent_demo"],
     "verbosity": 2,  # show the output of each task
 }
 
@@ -123,6 +125,17 @@ def task_agent_ask():
     }
 
 
+def task_app():
+    """Launch the Streamlit voice UI: uv run doit app [-p 8501]. Stop with Ctrl+C."""
+    return {
+        "actions": [f'"{PYTHON}" -m streamlit run "{STREAMLIT_APP}" --server.port %(port)s'],
+        "params": [{"name": "port", "short": "p", "default": "8501", "help": "port for the UI"}],
+        "file_dep": [STREAMLIT_APP] if STREAMLIT_APP.exists() else [],
+        "uptodate": [False],
+        "verbosity": 2,
+    }
+
+
 # ProofAgent evaluation (Beste, #55). Settings in config/eval.py; see docs/components/evaluation.md.
 
 def task_eval_validate():
@@ -149,10 +162,18 @@ def task_eval_dry_run():
     }
 
 
-def task_eval():
-    """Full ProofAgent evaluation on the real index; uploads to the dashboard (EVAL_AGENT_VERSION=v1 ...)."""
+def task_eval_checks():
+    """Deterministic checks (budget, age, citations, spoken length, ...) over the latest ProofAgent turn log."""
     return {
-        "actions": [f'"{PYTHON}" -m eval.run'],
+        "actions": [f'"{PYTHON}" -m eval.checks'],
+        "uptodate": [False],
+    }
+
+
+def task_eval():
+    """Full ProofAgent evaluation on the real index, then the deterministic checks (EVAL_AGENT_VERSION=v2 ...)."""
+    return {
+        "actions": [f'"{PYTHON}" -m eval.run', f'"{PYTHON}" -m eval.checks'],
         "file_dep": [CHROMA_DIR / "chroma.sqlite3"],
         "uptodate": [False],
     }

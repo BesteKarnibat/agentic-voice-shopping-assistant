@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import re
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, Field
 
@@ -24,7 +25,14 @@ from contracts.state import AgentState, Citation, ComparisonRow, log_step
 
 WARNING_NOTE = "Check the age grade and warnings on the package."
 SPOKEN_WARNING = "Please check the package warnings."
+AGE_NOT_LISTED = "age range not listed"
+AGE_NOTE = "Some of these listings don't state an age range."
 SMALL_PARTS_WORDS = ("small part", "choking")
+# Price labels, the same wording as the Reconcile notes: "catalog price (2020)" and "current price at <store>".
+CATALOG_LABEL = "catalog price (2020)"
+PRICE_NOTE = "These are 2020 catalog prices. Want me to check current ones?"
+PRICE_NOTE_NO_LIVE = "I couldn't find a current price for the ones marked catalog price (2020)."
+SPOKEN_PRICE_NOTE = "Prices are from our 2020 catalog."
 MARKER_RE = re.compile(r"\[\d+\]")
 
 
@@ -53,8 +61,30 @@ def limit_words(text: str, n: int) -> str:
     return text if len(words) <= n else " ".join(words[:n]).rstrip(",.;:") + "."
 
 
-def clean_spoken(text: str, needs_warning: bool) -> str:
+def price_label(row: ComparisonRow) -> str:
+    """'$12.15 catalog price (2020)', '$14.97 current price at walmart.com', or 'price not listed'."""
+    if row.get("price") is None:
+        return "price not listed"
+    if row.get("price_source") == "web":
+        store = urlsplit(row.get("live_url") or "").netloc.removeprefix("www.") or "the store"
+        return f"${row['price']:.2f} current price at {store}"
+    return f"${row['price']:.2f} {CATALOG_LABEL}"
+
+
+def price_note(state: AgentState, rows: list[ComparisonRow]) -> str | None:
+    """Closing line when any shown price comes from the 2020 catalog."""
+    if not any(r.get("price") is not None and r.get("price_source") == "catalog" for r in rows):
+        return None
+    asked_live = bool((state.get("constraints") or {}).get("wants_current_info"))
+    return PRICE_NOTE_NO_LIVE if asked_live else PRICE_NOTE
+
+
+def clean_spoken(text: str, needs_warning: bool, catalog_prices: bool = False) -> str:
     text = " ".join(MARKER_RE.sub("", text).split())
+    if catalog_prices and "$" in text and "2020" not in text:
+        budget = SPOKEN_SUMMARY_MAX_WORDS - len(SPOKEN_PRICE_NOTE.split()) - \
+            (len(SPOKEN_WARNING.split()) if needs_warning and "warning" not in text.lower() else 0)
+        text = limit_words(text, budget) + " " + SPOKEN_PRICE_NOTE
     if needs_warning and "warning" not in text.lower():
         budget = SPOKEN_SUMMARY_MAX_WORDS - len(SPOKEN_WARNING.split())
         return limit_words(text, budget) + " " + SPOKEN_WARNING
@@ -85,7 +115,9 @@ def select_products(state: AgentState) -> tuple[list[tuple[dict, dict]], list[st
     reconciled = state.get("reconciled") or []
     flagged = flagged_doc_ids(state.get("critic") or {}, [r["doc_id"] for r in reconciled])
 
-    picks, left_out, dropped = [], [], []
+    # With a child's age given, a product with no age grade is never preferred over one that fits:
+    # under 3 it is left out (small-parts risk), otherwise it is shown after the others, marked as not listed.
+    picks, no_age, left_out, dropped, unknown_names = [], [], [], [], []
     for r in reconciled:
         p = rag_by_id.get(r["doc_id"], {})
         name = short_title(r["title"], 6)
@@ -98,6 +130,8 @@ def select_products(state: AgentState) -> tuple[list[tuple[dict, dict]], list[st
             left_out.append(f"{name} is ${price:.2f}, over your ${budget:g} budget")
         elif age is not None and min_age is not None and min_age > age:
             left_out.append(f"{name} is for ages {min_age:g}+")
+        elif age is not None and age < 3 and min_age is None:
+            unknown_names.append(name)
         elif age is not None and age < 3 and _mentions(warnings, SMALL_PARTS_WORDS):
             left_out.append(f"{name} has a small-parts warning")
         elif excluded and (feat := next((e for e in excluded
@@ -106,8 +140,13 @@ def select_products(state: AgentState) -> tuple[list[tuple[dict, dict]], list[st
         elif min_rating is not None and p.get("rating") is not None and p["rating"] < min_rating:
             left_out.append(f"{name} is rated {p['rating']:g}, below {min_rating:g}")
         else:
-            picks.append((r, p))
-    picks.sort(key=lambda rp: rp[0].get("availability") == "out_of_stock")  # stable: keeps relevance order
+            (no_age if age is not None and min_age is None else picks).append((r, p))
+    if len(unknown_names) == 1:
+        left_out.append(f"{unknown_names[0]} doesn't list an age range")
+    elif unknown_names:
+        left_out.append(f"{len(unknown_names)} matches don't list an age range, so I can't confirm they suit a child under 3")
+    in_stock_first = lambda rp: rp[0].get("availability") == "out_of_stock"  # noqa: E731  stable: keeps relevance order
+    picks = sorted(picks, key=in_stock_first) + sorted(no_age, key=in_stock_first)
     return picks[:TOP_N_ANSWER], left_out, dropped
 
 
@@ -132,28 +171,38 @@ def build_table(picks: list[tuple[dict, dict]]) -> tuple[list[ComparisonRow], li
 
 def needs_warning_note(state: AgentState, picks: list[tuple[dict, dict]]) -> bool:
     age = (state.get("constraints") or {}).get("child_age_years")
-    return bool(picks) and ((age is not None and age < 3) or any(p.get("safety_warnings") for _, p in picks))
+    return bool(picks) and ((age is not None and age < 3) or any(p.get("safety_warnings") for _, p in picks)
+                            or (age is not None and any(p.get("min_age_years") is None for _, p in picks)))
+
+
+def needs_age_note(state: AgentState, picks: list[tuple[dict, dict]]) -> bool:
+    """A child's age was given and a shown product has no age grade."""
+    age = (state.get("constraints") or {}).get("child_age_years")
+    return age is not None and any(p.get("min_age_years") is None for _, p in picks)
 
 
 # ---------------------------------------------------------------- text
 
-def template_answer(picks, rows, left_out) -> tuple[str, str]:
+def template_answer(picks, rows, left_out, child_age=None) -> tuple[str, str]:
     """Deterministic answer (fake provider, no products, or LLM failure)."""
     if not picks:
-        answer = "I couldn't find a product in our catalog that matches all of your requirements."
-        if left_out:
-            answer += " " + "; ".join(left_out) + "."
-        answer += " Want me to try a different budget or type of toy?"
-        return answer, answer
+        first = "I couldn't find a product in our catalog that matches all of your requirements."
+        if child_age is not None:
+            question = f" Want me to look for toys made for a {child_age:g}-year-old instead?"
+        else:
+            question = " Want me to try a different budget or type of toy?"
+        answer = first + (" " + "; ".join(left_out) + "." if left_out else "") + question
+        return answer, first + " Details are on screen." + question
 
     lines = []
     for row, (r, p) in zip(rows, picks):
-        price = (f"${row['price']:.2f} ({row['price_source']})" if row["price"] is not None else "price not listed")
-        bits = [price]
+        bits = [price_label(row)]
         if p.get("rating") is not None:
             bits.append(f"{p['rating']} stars")
         if row["age_range"]:
             bits.append(f"ages {row['age_range']}")
+        elif child_age is not None:
+            bits.append(AGE_NOT_LISTED)
         line = f"{row['rank']}. {r['title']}: " + ", ".join(bits) + " " + "".join(row["citation_markers"])
         if p.get("safety_warnings"):
             line += f". Listing warnings: {'; '.join(p['safety_warnings'])}"
@@ -169,6 +218,7 @@ def template_answer(picks, rows, left_out) -> tuple[str, str]:
     spoken = f"My top pick is {short_title(top['title'], 6)}"
     if top.get("chosen_price") is not None:
         spoken += f" at ${top['chosen_price']:.2f}"
+        spoken += " in our 2020 catalog" if top.get("price_source") == "catalog" else ""
     spoken += "."
     if top.get("price_conflict"):
         spoken += " Its live price differs from our catalog."
@@ -185,10 +235,10 @@ def evidence(picks, rows) -> list[dict]:
         out.append({
             "rank": row["rank"], "citation_markers": row["citation_markers"],
             "title": r["title"], "brand": r.get("brand"),
-            "price": r.get("chosen_price"), "price_source": r.get("price_source"),
+            "price": r.get("chosen_price"), "price_source": r.get("price_source"), "price_label": price_label(row),
             "catalog_price": r.get("catalog_price"), "live_price": r.get("live_price"),
             "availability": r.get("availability"), "rating": p.get("rating"),
-            "age_range": row["age_range"], "safety_warnings": p.get("safety_warnings"),
+            "age_range": row["age_range"] or "not listed", "safety_warnings": p.get("safety_warnings"),
             "features": p.get("features_snippet"), "note": r.get("note"),
         })
     return out
@@ -233,6 +283,12 @@ def _title_key(title: str) -> list[str]:
     return _words(short_title(title, 6))[:3]
 
 
+def _names(words: list[str], key: list[str], mismatches: int) -> bool:
+    """True if `key` appears as consecutive words, allowing up to `mismatches` differing words."""
+    n = len(key)
+    return any(sum(w != k for w, k in zip(words[j:j + n], key)) <= mismatches for j in range(len(words) - n + 1))
+
+
 def place_markers(answer: str, rows: list[ComparisonRow]) -> tuple[str, int]:
     """Put each product's markers after the first sentence that names it; drop a marker cluster left at the end.
 
@@ -248,16 +304,15 @@ def place_markers(answer: str, rows: list[ComparisonRow]) -> tuple[str, int]:
         key = _title_key(row["title"])
         if not key or any(m in body_before for m in row["citation_markers"]):
             continue  # already cited in the text (outside an end-of-answer cluster)
-        for i, piece in enumerate(pieces):
-            words = _words(piece)
-            named = any(words[j:j + len(key)] == key for j in range(len(words) - len(key) + 1)) \
-                or (len(key) >= 2 and words[: len(key)] == key)
-            if not named:
-                continue
-            if not any(m in piece for m in row["citation_markers"]):
-                pieces[i] = piece.rstrip() + " " + "".join(row["citation_markers"])
-                placed += 1
-            break
+        # Exact title words first; then, on lines with no marker yet, allow one differing word
+        # (the LLM fixes catalog typos, e.g. "Small Wold Toys" -> "Small World Toys").
+        hit = next((i for i, piece in enumerate(pieces) if _names(_words(piece), key, 0)), None)
+        if hit is None and len(key) == 3:
+            hit = next((i for i, piece in enumerate(pieces)
+                        if not MARKER_RE.search(piece) and _names(_words(piece), key, 1)), None)
+        if hit is not None and not any(m in pieces[hit] for m in row["citation_markers"]):
+            pieces[hit] = pieces[hit].rstrip() + " " + "".join(row["citation_markers"])
+            placed += 1
     text = "".join(p + (seps[i] if i < len(seps) else "") for i, p in enumerate(pieces))
     trailing = _TRAILING_MARKERS.search(text)
     if placed and trailing:
@@ -291,7 +346,8 @@ def answerer_node(state: AgentState) -> dict:
     revision = state.get("revision_count", 0)
 
     source, meta, errors = "template", {}, []
-    answer, spoken = template_answer(picks, rows, left_out)
+    child_age = (state.get("constraints") or {}).get("child_age_years")
+    answer, spoken = template_answer(picks, rows, left_out, child_age)
     if picks and get_llm_settings("answerer").provider != "fake":
         try:
             llm_text, llm_spoken, meta = llm_answer(state, picks, rows, left_out)
@@ -311,9 +367,14 @@ def answerer_node(state: AgentState) -> dict:
             errors.append(f"answerer: LLM call failed, used template: {e}")
             meta = {"error": str(e)}
 
+    if needs_age_note(state, picks) and "age range" not in answer.lower():
+        answer += "\n" + AGE_NOTE
     if warn and WARNING_NOTE.lower() not in answer.lower():
         answer += "\n" + WARNING_NOTE
-    spoken = clean_spoken(spoken, warn)
+    note = price_note(state, rows)
+    if note and note.lower() not in answer.lower():
+        answer += "\n" + note
+    spoken = clean_spoken(spoken, warn, catalog_prices=any(r.get("price_source") == "catalog" for r in rows))
 
     summary = f"{len(rows)} products, {len(citations)} citations ({source})"
     if revision:

@@ -100,6 +100,63 @@ def test_implausible_live_price_is_not_used():
 def test_catalog_price_kept_when_user_did_not_ask_for_current_info():
     r = reconcile_product(PRODUCTS["amz-fake-006"], FAKE_WEB_RESULTS, prefer_live=False)
     assert r["price_conflict"] and r["chosen_price"] == 19.99 and r["price_source"] == "catalog"
+    assert "catalog price (2020)" in r["note"] and "current price at" in r["note"]
+
+
+# Beste's v1b report T23: a Walmart category page ($14.97) was taken as the live price of Crayola Dough ($8.99).
+CRAYOLA = {"doc_id": "c1", "sku": "B07FQ4N4PB", "brand": "Crayola", "price": 8.99,
+           "title": "Crayola Dough, 3 lbs., Red, Modeling Dough for Kids"}
+CRAYOLA_BROWSE = {"title": "Crayola Dough Clay and Slime | Multicolor", "source_domain": "walmart.com",
+                  "url": "https://www.walmart.com/browse/arts-crafts/crayola-dough-clay-and-slime/1334134_5899871",
+                  "snippet": "Shop Crayola Dough at Walmart. From $14.97", "price": 14.97, "availability": "unknown"}
+CRAYOLA_PAGE = {"title": "Crayola Dough, 3 lbs., Red", "source_domain": "walmart.com",
+                "url": "https://www.walmart.com/ip/Crayola-Dough-3-lbs-Red/123456789",
+                "snippet": "Crayola Dough 3 lbs Red $9.47", "price": 9.47, "availability": "in_stock"}
+
+
+def test_category_page_is_never_matched():
+    r = reconcile_product(CRAYOLA, [CRAYOLA_BROWSE], prefer_live=True)
+    assert r["match_method"] == "none" and r["live_price"] is None and r["live_url"] is None
+    assert r["chosen_price"] == 8.99 and r["note"] == "Price: $8.99 catalog price (2020)."
+
+
+def test_product_page_wins_over_category_page():
+    r = reconcile_product(CRAYOLA, [CRAYOLA_BROWSE, CRAYOLA_PAGE], prefer_live=True)
+    assert r["live_url"] == CRAYOLA_PAGE["url"] and r["chosen_price"] == 9.47 and r["price_source"] == "web"
+    assert r["note"] == "Price: $9.47 current price at walmart.com."
+
+
+@pytest.mark.parametrize("url,ok", [
+    ("https://www.walmart.com/ip/Voila-Family-Board-Game/335200377", True),
+    ("https://www.amazon.com/dp/B00NHQFA1I", True),
+    ("https://www.amazon.com/clp/B002SQBB3O", True),
+    ("https://www.amazon.com/gp/aw/d/B000PHQLME/ref=mp_s_a_1_1?qid=1386033423", True),
+    ("https://www.target.com/p/connect-4-classic-grid/-/A-22222222", True),
+    ("https://www.ebay.com/itm/267093687015", True),
+    ("https://www.barnesandnoble.com/w/tsuro-by-tom-mcmurchie-calliope-games/1146366358", True),
+    ("https://www.walmart.com/browse/toys/jigsaw-puzzles/cardinal/4171_4191_163840_4981610", False),
+    ("https://business.walmart.com/search?q=TOMY%20Games", False),
+    ("https://www.amazon.com/Toys-Games-Calliope/s?rh=n%3A165793011", False),
+    ("https://www.amazon.com/s?k=crayola+dough", False),
+    ("https://www.amazon.com/b?ie=UTF8&node=17462647011", False),
+    ("https://www.amazon.com/stores/FoxMind/page/23719D87", False),
+    ("https://www.target.com/s/crayola+dough", False),
+    ("https://www.target.com/c/play-dough/-/N-5xt9t", False),
+    ("https://www.nytimes.com/wirecutter/reviews/best-family-board-games/", False),
+    ("https://example.com/about", False),
+    (None, False),
+])
+def test_is_product_page(url, ok):
+    from agent.nodes.reconcile import is_product_page
+    assert is_product_page(url) is ok
+
+
+def test_price_labels_in_notes():
+    live = reconcile_product(VOILA, [WALMART_VOILA], prefer_live=True)
+    assert "$9.84 current price at walmart.com" in live["note"]
+    assert "Price conflict: $9.84 current price at walmart.com vs $15.59 catalog price (2020)" in live["note"]
+    no_live = reconcile_product(VOILA, [], prefer_live=False)
+    assert no_live["note"] == "Price: $15.59 catalog price (2020)."
 
 
 # ---------------------------------------------------------------- Critic loop (#17)
