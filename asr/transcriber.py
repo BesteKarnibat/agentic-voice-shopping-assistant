@@ -5,6 +5,7 @@ so no system ffmpeg is needed) or a 16 kHz mono float32 numpy array.
 """
 from __future__ import annotations
 
+import logging
 import os
 import time
 from dataclasses import dataclass, field
@@ -15,6 +16,8 @@ import numpy as np
 from config.paths import PROMPTS_DIR
 
 SAMPLE_RATE = 16_000
+
+log = logging.getLogger(__name__)
 
 # Biases decoding toward shopping vocabulary, brands and prices; helps with
 # accented speech where "thirteen" / "thirty" or brand names are easily confused.
@@ -62,6 +65,10 @@ class WhisperTranscriber:
     model_size: tiny/base/small/medium/large-v3 (or "distil-large-v3").
       "small" is a good CPU default; use "large-v3" on GPU for best accent
       robustness.
+    device: "cpu" by default, so it works on machines without the CUDA libraries.
+      Set ASR_DEVICE=cuda (or auto) to use a GPU; if the GPU can't be used
+      (e.g. "cublas64_12.dll not found") it falls back to CPU automatically.
+    compute_type: "int8" by default (fast on CPU); use "float16" with a GPU.
     language: "en" (most accurate for English) or None to auto-detect, which
       handles non-English / code-switched speakers.
     """
@@ -69,8 +76,8 @@ class WhisperTranscriber:
     def __init__(
         self,
         model_size: str = os.getenv("ASR_MODEL", "small"),
-        device: str = os.getenv("ASR_DEVICE", "auto"),
-        compute_type: str = os.getenv("ASR_COMPUTE", "default"),
+        device: str = os.getenv("ASR_DEVICE", "cpu"),
+        compute_type: str = os.getenv("ASR_COMPUTE", "int8"),
         language: Optional[str] = "en",
         initial_prompt: Optional[str] = DEFAULT_PROMPT,
         word_timestamps: bool = False,
@@ -94,11 +101,16 @@ class WhisperTranscriber:
             )
         return self._model
 
-    def transcribe(self, audio: Union[str, os.PathLike, np.ndarray]) -> TranscriptionResult:
-        if isinstance(audio, (str, os.PathLike)) and not os.path.isfile(audio):
-            raise FileNotFoundError(f"Audio file not found: {audio}")
+    def _fall_back_to_cpu(self, err: Exception) -> bool:
+        """GPU libraries missing or broken: switch to CPU. False if already on CPU."""
+        if self.device == "cpu":
+            return False
+        log.warning("ASR on device=%s failed (%s); falling back to CPU", self.device, err)
+        self.device, self.compute_type, self._model = "cpu", "int8", None
+        return True
+
+    def _run(self, audio):
         model = self._load()
-        t0 = time.perf_counter()
         seg_iter, info = model.transcribe(
             audio if isinstance(audio, np.ndarray) else str(audio),
             language=self.language,
@@ -111,7 +123,7 @@ class WhisperTranscriber:
             word_timestamps=self.word_timestamps,
         )
         segments = []
-        for s in seg_iter:
+        for s in seg_iter:  # lazy: GPU errors can surface here
             words = [
                 {"start": round(w.start, 2), "end": round(w.end, 2), "word": w.word,
                  "probability": round(w.probability, 3)}
@@ -119,6 +131,18 @@ class WhisperTranscriber:
             ]
             segments.append(Segment(s.start, s.end, s.text.strip(), s.avg_logprob,
                                     s.no_speech_prob, words))
+        return segments, info
+
+    def transcribe(self, audio: Union[str, os.PathLike, np.ndarray]) -> TranscriptionResult:
+        if isinstance(audio, (str, os.PathLike)) and not os.path.isfile(audio):
+            raise FileNotFoundError(f"Audio file not found: {audio}")
+        t0 = time.perf_counter()
+        try:
+            segments, info = self._run(audio)
+        except (RuntimeError, OSError) as e:  # e.g. cublas64_12.dll not found
+            if not self._fall_back_to_cpu(e):
+                raise
+            segments, info = self._run(audio)
         text = " ".join(s.text for s in segments if s.text).strip()
         return TranscriptionResult(
             text=text,

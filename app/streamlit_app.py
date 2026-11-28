@@ -86,9 +86,13 @@ def handle_input(text: str | None = None, audio_bytes: bytes | None = None, suff
     """Run one turn and append the user's and the assistant's chat messages."""
     text = (text or "").strip() or None
     audio_path = save_audio(audio_bytes, suffix) if audio_bytes and not text else None
-    with st.spinner("Listening and thinking..."):
+    with st.status("Listening and thinking...", expanded=True) as status:
+        def show_step(entry: dict) -> None:  # called as each agent node finishes
+            status.write(f"**{entry['node']}**: {entry['summary']}")
+
         state, mode = run_turn(audio_path=audio_path, text=text,
-                               session_id=st.session_state["chat_id"])
+                               session_id=st.session_state["chat_id"], on_step=show_step)
+        status.update(label="Done", state="complete", expanded=False)
     heard = state.get("transcript") or ""
     msgs = st.session_state["messages"]
     msgs.append({"role": "user", "content": heard or "🎙️ (nothing recognised)",

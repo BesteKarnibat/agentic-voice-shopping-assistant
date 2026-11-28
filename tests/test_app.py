@@ -93,3 +93,14 @@ def test_agent_exception_is_reported():
 
     state, mode = run_turn(text="hi", agent=boom)
     assert mode == "agent" and any("graph down" in e for e in state["errors"])
+
+
+def test_on_step_is_forwarded_to_agent():
+    got = []
+
+    def agent(t, **kw):
+        kw["on_step"]({"node": "router", "summary": "ok"})
+        return {"final_answer": "A", "spoken_summary": "A"}
+
+    run_turn(text="hi", agent=agent, tts_node=lambda s: {}, on_step=got.append)
+    assert got == [{"node": "router", "summary": "ok"}]

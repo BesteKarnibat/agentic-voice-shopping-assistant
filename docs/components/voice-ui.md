@@ -26,7 +26,7 @@ Code: [`asr/transcriber.py`](../../asr/transcriber.py), [`asr/node.py`](../../as
 
 | Aspect | Choice |
 |--------|--------|
-| Model | [faster-whisper](https://github.com/SYSTRAN/faster-whisper), local. Default `small`; `ASR_MODEL`, `ASR_DEVICE`, `ASR_COMPUTE` override. Use `large-v3` on a GPU. |
+| Model | [faster-whisper](https://github.com/SYSTRAN/faster-whisper), local. Default `small` on CPU (`int8`); `ASR_MODEL`, `ASR_DEVICE`, `ASR_COMPUTE` override. For a GPU set `ASR_DEVICE=cuda` and `ASR_COMPUTE=float16`; if the CUDA libraries are missing (e.g. `cublas64_12.dll not found`) it logs a warning and falls back to CPU. |
 | Input | A WAV/MP3 file path (decoded by PyAV, no system ffmpeg), or a 16 kHz float32 array. |
 | Streaming | `StreamingASR.feed(pcm16_bytes)` takes live 16 kHz int16 chunks and returns a result after ~1 s of silence or 30 s of speech. |
 | Timestamps | Segment `start`/`end` always. Word-level times with `word_timestamps=True`. |
@@ -77,7 +77,7 @@ The screen is split in half. **Left:** the voice chat. **Right:** everything the
 
 The sidebar's **New chat** button clears the conversation and the right panel.
 
-**Agent connection:** `app/pipeline.py` calls `agent.run_agent(transcript, session_id=..., asr_segments=...)` ([agent/run.py](../../agent/run.py)), which runs the real graph against the real RAG index and MCP server. `AGENT_ENTRY` (default `agent:run_agent`) can point at another entry point. If the returned state has no `tts_audio_path`, the UI runs TTS itself. `run_agent` never raises and always returns a `final_answer` (a fallback apology on failure, with the cause in `errors`). If the import fails, only speech recognition runs and the UI says so. No sample data is shown.
+**Agent connection:** `app/pipeline.py` calls `agent.run_agent(transcript, session_id=..., asr_segments=...)` ([agent/run.py](../../agent/run.py)), which runs the real graph against the real RAG index and MCP server. `AGENT_ENTRY` (default `agent:run_agent`) can point at another entry point. If the returned state has no `tts_audio_path`, the UI runs TTS itself. The UI passes `on_step`, so each agent step appears live while the answer is being built. `run_agent` never raises and always returns a `final_answer` (a fallback apology on failure, with the cause in `errors`). If the import fails, only speech recognition runs and the UI says so. No sample data is shown.
 
 ## 5. Usage
 

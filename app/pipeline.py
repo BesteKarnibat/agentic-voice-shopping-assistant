@@ -47,8 +47,10 @@ def has_reply(state: dict) -> bool:
 
 def run_turn(audio_path: Optional[str] = None, text: Optional[str] = None,
              session_id: Optional[str] = None, agent: Optional[Callable] = None,
-             tts_node: Optional[Callable] = None) -> tuple:
-    """Returns (final_state, mode) where mode is 'agent' or 'asr_only'."""
+             tts_node: Optional[Callable] = None, on_step: Optional[Callable] = None) -> tuple:
+    """Returns (final_state, mode) where mode is 'agent' or 'asr_only'.
+
+    on_step(entry) is called in the caller's thread as each graph node finishes (live progress)."""
     state: dict = {"session_id": session_id or uuid.uuid4().hex[:8], "step_log": [], "errors": []}
     if audio_path:
         state["audio_path"] = audio_path
@@ -65,8 +67,9 @@ def run_turn(audio_path: Optional[str] = None, text: Optional[str] = None,
 
     # 2. LangGraph workflow
     try:
+        extra = {"on_step": on_step} if on_step else {}
         result = agent(state["transcript"], session_id=state["session_id"],
-                       asr_segments=state.get("asr_segments") or []) or {}
+                       asr_segments=state.get("asr_segments") or [], **extra) or {}
     except Exception as e:  # show the failure in the chat instead of crashing the page
         return _merge(state, {"errors": [f"agent: {type(e).__name__}: {e}"]}), "agent"
     # Keep our ASR fields and step-log entry; take everything else from the agent's state.

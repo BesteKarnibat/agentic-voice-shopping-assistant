@@ -42,3 +42,31 @@ def test_streaming_endpointing():
     for _ in range(5):
         res = s.feed(chunk(0.0)) or res
     assert res and res.text and len(f.calls) == 1
+
+
+def test_gpu_failure_falls_back_to_cpu(monkeypatch):
+    from asr.transcriber import WhisperTranscriber
+
+    t = WhisperTranscriber(device="cuda", compute_type="float16")
+    calls = []
+
+    def fake_run(audio):
+        calls.append(t.device)
+        if t.device != "cpu":
+            raise RuntimeError("Library cublas64_12.dll is not found or cannot be loaded")
+
+        class Info:
+            language, language_probability, duration = "en", 1.0, 1.0
+
+        return [Segment(0.0, 1.0, "hi")], Info()
+
+    monkeypatch.setattr(t, "_run", fake_run)
+    monkeypatch.setattr("os.path.isfile", lambda p: True)
+    r = t.transcribe("x.wav")
+    assert r.text == "hi" and calls == ["cuda", "cpu"] and t.compute_type == "int8"
+
+
+def test_default_device_is_cpu():
+    from asr.transcriber import WhisperTranscriber
+
+    assert WhisperTranscriber().device == "cpu"
