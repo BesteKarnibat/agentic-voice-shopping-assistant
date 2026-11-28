@@ -255,3 +255,35 @@ def test_typo_fallback_never_cites_another_products_line():
     rows = [{"title": "LEGO Classic Medium Brick Box", "citation_markers": ["[1]"]}]
     out, placed = place_markers("LEGO Classic Large Brick Box, $49.99 [2].", rows)
     assert placed == 0 and "[1]" not in out
+
+
+def test_catalog_prices_are_labelled_2020_and_offer_a_live_check():
+    from agent.nodes.answerer import PRICE_NOTE
+    s = _run(_state([GAME]))
+    assert "$12.99 catalog price (2020)" in s["final_answer"]
+    assert s["final_answer"].rstrip().endswith(PRICE_NOTE)
+    assert "2020" in s["spoken_summary"]
+
+
+def test_live_price_labelled_with_store_and_no_2020_note():
+    rag, rec = _product("d-live", "Family Card Game Night Edition", 12.99, 4.7, 7)
+    rec = {**rec, "live_price": 15.49, "chosen_price": 15.49, "price_source": "web",
+           "live_url": "https://www.walmart.com/ip/family-card-game/123"}
+    s = _state([(rag, rec)], wants_current_info=True)
+    s["web_results"] = [{"url": rec["live_url"], "title": "x"}]
+    s = _run(s)
+    assert "$15.49 current price at walmart.com" in s["final_answer"]
+    assert "2020 catalog prices" not in s["final_answer"]
+
+
+def test_asked_for_current_price_but_only_catalog_found():
+    from agent.nodes.answerer import PRICE_NOTE_NO_LIVE
+    s = _run(_state([GAME], wants_current_info=True))
+    assert PRICE_NOTE_NO_LIVE in s["final_answer"] and "Want me to check current" not in s["final_answer"]
+
+
+def test_spoken_catalog_price_gets_the_year():
+    from agent.nodes.answerer import SPOKEN_PRICE_NOTE, clean_spoken
+    out = clean_spoken("My top pick is the card game at $12.99. Details are on screen.", False, catalog_prices=True)
+    assert out.endswith(SPOKEN_PRICE_NOTE) and len(out.split()) <= 40
+    assert clean_spoken("Top pick at $12.99 in our 2020 catalog.", False, catalog_prices=True).count("2020") == 1
