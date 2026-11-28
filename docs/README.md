@@ -16,7 +16,7 @@ sections, replace every `TODO`, and delete guidance comments (`<!-- ... -->`) wh
 | Setup, `.env.example`, run/build scripts | [components/setup.md](components/setup.md) | Devanshu | `feature/graph` | todo |
 | Voice and UI usage | [components/voice-ui.md](components/voice-ui.md) | Alekhya | `feature/ui` | todo |
 | Safety considerations | [components/safety.md](components/safety.md) | Beste | `feature/eval` | todo |
-| Evaluation methodology | [components/evaluation.md](components/evaluation.md) | Beste | `feature/eval` | todo |
+| Evaluation methodology | [components/evaluation.md](components/evaluation.md) | Beste | `feature/eval` | draft |
 
 Prompts are documented separately in [../prompts/README.md](../prompts/README.md) (mapped to nodes).
 Update the Status column here (`todo` → `draft` → `done`) in the same PR that changes the file.
