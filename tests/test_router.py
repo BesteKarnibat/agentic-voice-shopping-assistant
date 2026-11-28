@@ -82,3 +82,42 @@ def test_child_safety_runs_the_full_graph(monkeypatch):
     s = run_agent("My son is 2. I want the chemistry set for ages 8 and up.")
     assert "refuse" not in nodes(s) and "answerer" in nodes(s)
     assert "can't help with that" not in s["final_answer"].lower()
+
+
+# ---------------------------------------------------------------- follow-ups (#96), eval/agent.py format
+
+from eval.agent import compose_transcript  # noqa: E402
+
+CARD_TURN = {"user": "Recommend a card game for family night.", "products": ["UNO", "Phase 10", "Skip-Bo"]}
+PRICE_TURN = {"user": "A board game under $30. What's the current price?", "products": ["Tsuro", "Voila"]}
+
+
+@pytest.mark.parametrize("message,history,expected", [
+    ("Why these 3 picks?", [CARD_TURN], "product_question"),
+    ("Which one is cheapest?", [CARD_TURN], "product_question"),
+    ("Is the second one in stock?", [CARD_TURN], "product_question"),
+    ("5, under $20.", [{"user": "I need a gift.", "products": []}], "product_search"),
+])
+def test_followups_are_never_out_of_scope(message, history, expected):
+    transcript = compose_transcript(message, history, keep=2)
+    constraints = {"child_age_years": 5, "budget_max": 20} if message.startswith("5") else {}
+    for intent in ("out_of_scope", "unclear"):
+        assert _normalize(_decision(intent, constraints=constraints), transcript)["intent"] == expected
+
+
+def test_off_topic_followup_stays_out_of_scope():
+    transcript = compose_transcript("Write me a poem about Paris.", [CARD_TURN], keep=2)
+    assert _normalize(_decision("out_of_scope"), transcript)["intent"] == "out_of_scope"
+
+
+def test_earlier_current_price_does_not_turn_on_live_search():
+    transcript = compose_transcript("Which one is cheapest?", [PRICE_TURN], keep=2)
+    assert _normalize(_decision("product_question"), transcript)["constraints"]["wants_current_info"] is False
+    stock = compose_transcript("Is the second one in stock?", [CARD_TURN], keep=2)
+    assert _normalize(_decision("product_question"), stock)["constraints"]["wants_current_info"] is True
+
+
+def test_new_message_extraction():
+    from agent.nodes.router import new_message
+    assert new_message(compose_transcript("Which one?", [CARD_TURN], keep=2)) == "Which one?"
+    assert new_message("Plain request.") == "Plain request."

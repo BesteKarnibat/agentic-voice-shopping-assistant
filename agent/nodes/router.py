@@ -10,7 +10,7 @@ import re
 from agent.llm import invoke_structured
 from agent.prompts import prompt_section, system_prompt_for
 from agent.schemas import SAFE_CATEGORIES, UNSAFE_CATEGORIES, RouterDecision
-from config.graph import CURRENT_INFO_KEYWORDS, SHOPPING_WORDS
+from config.graph import CURRENT_INFO_KEYWORDS, FOLLOWUP_WORDS, SHOPPING_WORDS
 from contracts.state import AgentState, log_step
 
 DEFAULT_CLARIFICATION = "Happy to help! Who is the toy or game for, how old are they, and what's your budget?"
@@ -18,11 +18,23 @@ EMPTY_TRANSCRIPT_QUESTION = "Sorry, I didn't catch that. What kind of toy or gam
 SHOPPING_RE = re.compile(r"\b(" + "|".join(re.escape(w) for w in SHOPPING_WORDS) + r")s?\b", re.I)
 
 
+FOLLOWUP_RE = re.compile(r"\b(" + "|".join(FOLLOWUP_WORDS) + r")\b", re.I)
+NEW_MESSAGE_MARK = "New message:"
+
+
+def new_message(transcript: str) -> str:
+    """The latest user message of a composed transcript (eval/agent.py compose_transcript), else all of it."""
+    head, mark, tail = transcript.rpartition(NEW_MESSAGE_MARK)
+    return tail.strip() if mark else transcript
+
+
 def _normalize(decision: RouterDecision, transcript: str) -> dict:
     intent = decision.intent
     safety = dict(decision.safety)
     category = safety.get("category")
-    shopping = bool(SHOPPING_RE.search(transcript))
+    new = new_message(transcript)
+    shopping = bool(SHOPPING_RE.search(new))
+    has_history = new != transcript
 
     # #57: child_safety / unsupported_claim are answered (age and claims handled downstream), never refused.
     if category in SAFE_CATEGORIES:
@@ -38,9 +50,15 @@ def _normalize(decision: RouterDecision, transcript: str) -> dict:
             intent = "product_search"
 
     c = {k: v for k, v in dict(decision.constraints).items() if v is not None}
+    # #96: a follow-up about earlier picks, or an answer to a clarifying question ("5, under $20").
+    if has_history and intent in ("out_of_scope", "unclear") and category not in UNSAFE_CATEGORIES:
+        if FOLLOWUP_RE.search(new) and "You recommended:" in transcript:
+            intent = "product_question"
+        elif FOLLOWUP_RE.search(new) or any(k in c for k in ("budget_max", "child_age_years", "category", "brand")):
+            intent = "product_search"
     c["preferences"] = list(c.get("preferences") or [])
     c["exclude_features"] = list(c.get("exclude_features") or [])
-    lowered = transcript.lower()
+    lowered = new.lower()  # an earlier "current price" must not turn on live search for every follow-up
     c["wants_current_info"] = bool(c.get("wants_current_info")) or any(k in lowered for k in CURRENT_INFO_KEYWORDS)
     if c.get("budget_min") is not None and c.get("budget_max") is not None and c["budget_min"] > c["budget_max"]:
         c["budget_min"], c["budget_max"] = c["budget_max"], c["budget_min"]

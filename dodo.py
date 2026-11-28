@@ -30,10 +30,12 @@ from config.paths import (
 
 PYTHON = sys.executable  # the uv venv interpreter, since doit runs via `uv run doit`
 
-# Default chain (Devanshu): download → preprocess → index → app. Ends with the agent demo until
-# the app task lands.
+STREAMLIT_APP = ROOT / "app" / "streamlit_app.py"  # Alekhya's UI
+
+# Default chain (Devanshu): download → preprocess → index → app (agent_demo until the UI is merged).
 DOIT_CONFIG = {
-    "default_tasks": ["download_kaggle_dataset", "preprocess", "index", "agent_demo"],
+    "default_tasks": ["download_kaggle_dataset", "preprocess", "index",
+                      "app" if STREAMLIT_APP.exists() else "agent_demo"],
     "verbosity": 2,  # show the output of each task
 }
 
@@ -120,6 +122,17 @@ def task_agent_ask():
         "params": [{"name": "q", "short": "q", "default": "Recommend a card game for family night.",
                     "help": "user request text"}],
         "uptodate": [False],
+    }
+
+
+def task_app():
+    """Launch the Streamlit voice UI: uv run doit app [-p 8501]. Stop with Ctrl+C."""
+    return {
+        "actions": [f'"{PYTHON}" -m streamlit run "{STREAMLIT_APP}" --server.port %(port)s'],
+        "params": [{"name": "port", "short": "p", "default": "8501", "help": "port for the UI"}],
+        "file_dep": [STREAMLIT_APP] if STREAMLIT_APP.exists() else [],
+        "uptodate": [False],
+        "verbosity": 2,
     }
 
 
