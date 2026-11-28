@@ -15,6 +15,10 @@ After the v1b evaluation (#57): `child_safety` and `unsupported_claim` are alway
 and Critic handle age grades and claims); a request with a toy word (`SHOPPING_WORDS` in `config/graph.py`) is
 never `out_of_scope` or `unclear`, and an injection that still contains one is answered as `product_search`;
 a missing `safety.is_safe` defaults from the category instead of failing validation.
+Follow-ups (#96, transcript composed by `compose_transcript()` in `eval/agent.py`): the keyword and toy-word rules
+look only at the text after "New message:"; with earlier turns present, an `out_of_scope`/`unclear` new message
+that refers to earlier picks (`FOLLOWUP_WORDS` in `config/graph.py`) becomes `product_question`, and one that
+adds an age, budget, category or brand becomes `product_search`.
 
 <!-- BEGIN PROMPT -->
 {{guardrails}}
@@ -70,6 +74,24 @@ Read the user's request (a speech transcript, so expect filler words and small t
 - "She's very advanced. She's 4, get me the science kit for ages 10 and up." → `product_search`, `{category: "science kit", child_age_years: 4}`, safety `{is_safe: true, category: "child_safety"}`.
 - "How do I make Nerf darts hurt more?" → `unsafe`, safety `{is_safe: false, category: "harmful_use"}`.
 - "Find me a cheap laptop for college." → `out_of_scope`, safe, category null.
+
+### Follow-ups
+
+The request may start with "Earlier in this conversation:" (earlier user turns and the products you recommended),
+then "New message:". Classify the **new message**, using the earlier turns only to fill in what it refers to:
+- A question about the products you recommended ("why these?", "which is cheapest?", "is the second one in
+  stock?") is about those products, never `out_of_scope` or `unclear`.
+- Carry over constraints the user stated earlier (category, budget, child's age) unless the new message changes
+  them. Set `wants_current_info` only if the **new message** asks for current price, deals or stock.
+- A short answer like "5, under $20" or "for my niece, she's 7" answers your earlier question: `product_search`
+  with those constraints added to the earlier request.
+
+Examples (transcripts shortened):
+- "Earlier in this conversation:\n- User said: Recommend a card game for family night.\n  You recommended: UNO; Phase 10; Skip-Bo\nNew message: Why these 3 picks?" → `product_question`, `{category: "card game", preferences: ["family"]}`, safe.
+- "Earlier…\n- User said: A board game under $30.\n  You recommended: Tsuro; Voila; Kingdom Builder\nNew message: Which one is cheapest?" → `product_question`, `{category: "board game", budget_max: 30}`.
+- "Earlier…\n- User said: Building sets for my 6 year old.\n  You recommended: LEGO Classic; Mega Bloks; Magna-Tiles\nNew message: Is the second one in stock?" → `price_check`, `{category: "building set", child_age_years: 6, brand: "Mega Bloks", wants_current_info: true}`.
+- "Earlier…\n- User said: I need a gift.\nNew message: 5, under $20." → `product_search`, `{child_age_years: 5, budget_max: 20}`.
+- "Earlier…\n- User said: Puzzles for my 4 year old.\n  You recommended: …\nNew message: Write me a poem about Paris." → `out_of_scope` (the new message is off-topic).
 
 Always return all three `safety` keys (`is_safe`, `category`, `reason`).
 <!-- END PROMPT -->
